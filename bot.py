@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from datetime import datetime
+import time
 import pytz
 import requests
 from telegram import Update
@@ -141,18 +142,21 @@ def setup_sheets():
     ws = ss.add_worksheet(title="Global", rows=1000, cols=10)
     ws_id = ws._properties['sheetId']
 
-    ws.update(values=[["💰  GESTIÓN FINANCIERA — SEBA RODRÍGUEZ"]], range_name="A1")
-    ws.update(values=[["Actualizado:", ""]], range_name="A2")
-    ws.update(values=[["SALDOS TOTALES"]], range_name="A3")
-    ws.update(values=[["Total UYU", "Total USD", "Todo en UYU", "Todo en USD", "Cotización USD/UYU"]], range_name="A4")
-    ws.update(values=[["", "", "", "", ""]], range_name="A5")
-    ws.update(values=[["RESUMEN DEL MES"]], range_name="A7")
-    ws.update(values=[["", "PESOS (UYU)", "", "DÓLARES (USD)", ""]], range_name="A8")
-    ws.update(values=[["Ingresos", "", "", "", ""]], range_name="A9")
-    ws.update(values=[["Egresos", "", "", "", ""]], range_name="A10")
-    ws.update(values=[["Balance", "", "", "", ""]], range_name="A11")
-    ws.update(values=[["TODOS LOS MOVIMIENTOS"]], range_name="A13")
-    ws.update(values=[["FECHA", "DESCRIPCIÓN", "CATEGORÍA", "CUENTA", "MONEDA", "INGRESO", "EGRESO", "SALDO"]], range_name="A14")
+    # Batch all content updates into one call
+    ws.batch_update([
+        {"range": "A1", "values": [["💰  GESTIÓN FINANCIERA — SEBA RODRÍGUEZ"]]},
+        {"range": "A2", "values": [["Actualizado:", ""]]},
+        {"range": "A3", "values": [["SALDOS TOTALES"]]},
+        {"range": "A4", "values": [["Total UYU", "Total USD", "Todo en UYU", "Todo en USD", "Cotización USD/UYU"]]},
+        {"range": "A5", "values": [["", "", "", "", ""]]},
+        {"range": "A7", "values": [["RESUMEN DEL MES"]]},
+        {"range": "A8", "values": [["", "PESOS (UYU)", "", "DÓLARES (USD)", ""]]},
+        {"range": "A9", "values": [["Ingresos", "", "", "", ""]]},
+        {"range": "A10", "values": [["Egresos", "", "", "", ""]]},
+        {"range": "A11", "values": [["Balance", "", "", "", ""]]},
+        {"range": "A13", "values": [["TODOS LOS MOVIMIENTOS"]]},
+        {"range": "A14", "values": [["FECHA", "DESCRIPCIÓN", "CATEGORÍA", "CUENTA", "MONEDA", "INGRESO", "EGRESO", "SALDO"]]},
+    ])
 
     reqs = []
     # Fila 1 título
@@ -192,8 +196,10 @@ def setup_sheets():
         ss.del_worksheet(ss.worksheet("Cuentas"))
     ws2 = ss.add_worksheet(title="Cuentas", rows=1000, cols=8)
     ws2_id = ws2._properties['sheetId']
-    ws2.update(values=[["📋  REGISTRO DE MOVIMIENTOS — TODAS LAS CUENTAS"]], range_name="A1")
-    ws2.update(values=[["FECHA","DESCRIPCIÓN","CATEGORÍA","CUENTA","MONEDA","INGRESO","EGRESO","SALDO"]], range_name="A3")
+    ws2.batch_update([
+        {"range": "A1", "values": [["📋  REGISTRO DE MOVIMIENTOS — TODAS LAS CUENTAS"]]},
+        {"range": "A3", "values": [["FECHA","DESCRIPCIÓN","CATEGORÍA","CUENTA","MONEDA","INGRESO","EGRESO","SALDO"]]},
+    ])
     reqs2 = [
         fmt_req(ws2_id,1,1,1,8, bold=True, bg=AZUL_OSC, fg=TEXTO_BLA, size=13, align="CENTER"),
         merge_req(ws2_id,1,1,1,8), row_h(ws2_id,1,45),
@@ -210,8 +216,10 @@ def setup_sheets():
         ss.del_worksheet(ss.worksheet("Inversiones"))
     ws3 = ss.add_worksheet(title="Inversiones", rows=500, cols=7)
     ws3_id = ws3._properties['sheetId']
-    ws3.update(values=[["📈  REGISTRO DE INVERSIONES"]], range_name="A1")
-    ws3.update(values=[["FECHA","ACTIVO","MONTO","MONEDA","CUENTA ORIGEN","COTIZACIÓN","NOTAS"]], range_name="A3")
+    ws3.batch_update([
+        {"range": "A1", "values": [["📈  REGISTRO DE INVERSIONES"]]},
+        {"range": "A3", "values": [["FECHA","ACTIVO","MONTO","MONEDA","CUENTA ORIGEN","COTIZACIÓN","NOTAS"]]},
+    ])
     reqs3 = [
         fmt_req(ws3_id,1,1,1,7, bold=True, bg=MORADO, fg=TEXTO_BLA, size=13, align="CENTER"),
         merge_req(ws3_id,1,1,1,7), row_h(ws3_id,1,45),
@@ -226,7 +234,7 @@ def setup_sheets():
             try: ss.del_worksheet(ss.worksheet(hoja))
             except: pass
 
-    return "✅ Diseño aplicado correctamente. ¡Ya podés empezar a cargar tus movimientos!"
+    return "✅ Diseño aplicado y todo reseteado a cero. ¡Listo para empezar!"
 
 def update_global_summary():
     try:
