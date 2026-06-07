@@ -157,7 +157,7 @@ def setup_sheets():
 
     reqs = []
     # Deshacer todos los merges existentes primero
-    reqs.append({"unmergeAll": {"range": {"sheetId": ws_id, "startRowIndex": 0, "endRowIndex": 50, "startColumnIndex": 0, "endColumnIndex": 10}}})
+    reqs.append({"mergeCells": {"range": {"sheetId": ws_id, "startRowIndex": 0, "endRowIndex": 50, "startColumnIndex": 0, "endColumnIndex": 10}, "mergeType": "MERGE_NONE"}})
     # Fila 1 título
     reqs += [fmt_req(ws_id,1,1,1,8, bold=True, bg=AZUL_OSC, fg=TEXTO_BLA, size=14, align="CENTER"), merge_req(ws_id,1,1,1,8), row_h(ws_id,1,48)]
     # Fila 2 actualizado
