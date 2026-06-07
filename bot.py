@@ -457,6 +457,7 @@ def execute_action(action):
             all_data = ws.get_all_values()
             if fila_int <= len(all_data):
                 row = all_data[fila_int - 1]
+                desc_orig = row[1] if len(row) > 1 else "movimiento"
                 # Aplicar cambios
                 if "monto" in action:
                     nuevo_monto = float(action["monto"])
@@ -472,27 +473,37 @@ def execute_action(action):
                 if "categoria" in action:
                     ws.update_cell(fila_int, 3, action["categoria"])
                 if "cuenta" in action:
-                    ws.update_cell(fila_int, 4, action["cuenta"])
-                # Recalcular todos los saldos desde esa fila en adelante
+                    ws.update_cell(fila_int, 4, normalize_cuenta(action["cuenta"]))
+                # Recalcular saldos por cuenta
+                time.sleep(2)
                 all_data2 = ws.get_all_values()
-                for i, r in enumerate(all_data2[3:], start=4):
+                # Agrupar filas por cuenta y recalcular saldo acumulado
+                for idx in range(3, len(all_data2)):
+                    r = all_data2[idx]
                     if len(r) >= 7 and r[3]:
                         cuenta_r = r[3]
-                        saldo = 0.0
-                        for prev in all_data2[3:i-1]:
+                        saldo_acum = 0.0
+                        for prev_idx in range(3, idx):
+                            prev = all_data2[prev_idx]
                             if len(prev) >= 8 and prev[3] == cuenta_r:
-                                saldo += (float(prev[5].replace(',','.')) if prev[5] else 0) - (float(prev[6].replace(',','.')) if prev[6] else 0)
-                        ing = float(r[5].replace(',','.')) if r[5] else 0
-                        eg = float(r[6].replace(',','.')) if r[6] else 0
-                        ws.update_cell(i, 8, round(saldo + ing - eg, 2))
+                                try:
+                                    ing = float(str(prev[5]).replace(',','.')) if prev[5] else 0
+                                    eg = float(str(prev[6]).replace(',','.')) if prev[6] else 0
+                                    saldo_acum += ing - eg
+                                except: pass
+                        try:
+                            ing = float(str(r[5]).replace(',','.')) if r[5] else 0
+                            eg = float(str(r[6]).replace(',','.')) if r[6] else 0
+                            ws.update_cell(idx + 1, 8, round(saldo_acum + ing - eg, 2))
+                        except: pass
                 # Limpiar Global y actualizar
                 ws_global = ss.worksheet("Global")
                 all_global = ws_global.get_all_values()
                 if len(all_global) >= 15:
                     ws_global.batch_clear([f"A15:H{len(all_global) + 5}"])
+                time.sleep(2)
                 update_global_summary()
-                desc = action.get("descripcion", all_data[fila_int-1][1] if len(all_data[fila_int-1]) > 1 else "movimiento")
-                return f"✅ *Editado correctamente*\n📝 {desc}"
+                return f"✅ *Editado correctamente*\n📝 {action.get('descripcion', desc_orig)}"
         return "❌ No pude identificar qué editar."
 
     return "❌ No entendí la operación."
