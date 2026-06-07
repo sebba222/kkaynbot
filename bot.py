@@ -24,6 +24,20 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapi
 CUENTAS_VALIDAS = ["BBVA UYU", "BBVA USD", "Itaú UYU", "Itaú USD", "Efectivo UYU", "Efectivo USD"]
 conversation_history = {}
 
+def normalize_cuenta(nombre):
+    """Normaliza el nombre de cuenta para evitar variaciones de tildes/mayúsculas"""
+    if not nombre:
+        return nombre
+    # Mapa de variaciones conocidas
+    variaciones = {
+        "bbva uyu": "BBVA UYU", "bbva usd": "BBVA USD",
+        "itau uyu": "Itaú UYU", "itaú uyu": "Itaú UYU", "itàu uyu": "Itaú UYU", "itaù uyu": "Itaú UYU",
+        "itau usd": "Itaú USD", "itaú usd": "Itaú USD", "itàu usd": "Itaú USD", "itaù usd": "Itaú USD",
+        "efectivo uyu": "Efectivo UYU", "efectivo usd": "Efectivo USD",
+    }
+    key = nombre.lower().strip()
+    return variaciones.get(key, nombre)
+
 def C(r, g, b):
     return {"red": r/255, "green": g/255, "blue": b/255}
 
@@ -320,7 +334,7 @@ def execute_action(action):
     usd_rate = get_usd_rate()
 
     if tipo == "gasto":
-        cuenta = action["cuenta"]; monto = float(action["monto"]); moneda = action.get("moneda","UYU")
+        cuenta = normalize_cuenta(action["cuenta"]); monto = float(action["monto"]); moneda = action.get("moneda","UYU")
         saldo = get_balance(ws, cuenta) - monto
         ws.append_row([fecha, action["descripcion"], action.get("categoria","Otro"), cuenta, moneda, "", monto, round(saldo,2)])
         update_global_summary()
@@ -328,7 +342,7 @@ def execute_action(action):
         return f"✅ *Gasto registrado*\n📝 {action['descripcion']}\n💸 {sym} {monto:,.2f} | {action.get('categoria','Otro')}\n🏦 {cuenta}\n💰 Saldo: {sym} {saldo:,.2f}"
 
     elif tipo == "ingreso":
-        cuenta = action["cuenta"]; monto = float(action["monto"]); moneda = action.get("moneda","UYU")
+        cuenta = normalize_cuenta(action["cuenta"]); monto = float(action["monto"]); moneda = action.get("moneda","UYU")
         saldo = get_balance(ws, cuenta) + monto
         ws.append_row([fecha, action["descripcion"], action.get("categoria","Sueldo"), cuenta, moneda, monto, "", round(saldo,2)])
         update_global_summary()
@@ -336,7 +350,7 @@ def execute_action(action):
         return f"✅ *Ingreso registrado*\n📝 {action['descripcion']}\n💚 {sym} {monto:,.2f} | {action.get('categoria','Ingreso')}\n🏦 {cuenta}\n💰 Saldo: {sym} {saldo:,.2f}"
 
     elif tipo == "transferencia":
-        origen = action["cuenta_origen"]; destino = action["cuenta_destino"]
+        origen = normalize_cuenta(action["cuenta_origen"]); destino = normalize_cuenta(action["cuenta_destino"])
         monto = float(action["monto"]); moneda = action.get("moneda","UYU")
         s_orig = get_balance(ws, origen) - monto
         s_dest = get_balance(ws, destino) + monto
@@ -348,7 +362,7 @@ def execute_action(action):
 
     elif tipo == "inversion":
         activo = action["activo"]; monto = float(action["monto"])
-        moneda = action.get("moneda","USD"); cuenta_orig = action["cuenta"]
+        moneda = action.get("moneda","USD"); cuenta_orig = normalize_cuenta(action["cuenta"])
         ws_inv = ss.worksheet("Inversiones")
         ws_inv.append_row([fecha, activo, monto, moneda, cuenta_orig, usd_rate, action.get("descripcion","")])
         saldo = get_balance(ws, cuenta_orig) - monto
@@ -377,7 +391,7 @@ def execute_action(action):
         return "❌ No pude identificar qué eliminar."
 
     elif tipo == "actualizar_saldo":
-        cuenta = action["cuenta"]; nuevo = float(action["saldo"])
+        cuenta = normalize_cuenta(action["cuenta"]); nuevo = float(action["saldo"])
         actual = get_balance(ws, cuenta); diff = nuevo - actual
         moneda = "USD" if "USD" in cuenta else "UYU"
         if diff > 0: ws.append_row([fecha, "Ajuste de saldo", "Ajuste", cuenta, moneda, diff, "", nuevo])
