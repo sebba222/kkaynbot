@@ -1,0 +1,21 @@
+services:
+  - type: worker
+    name: kkaynbot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SPREADSHEET_ID
+        sync: false
+      - key: AUTHORIZED_USER_ID
+        sync: false
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      - key: MIN_BALANCE_UYU
+        value: "500"
+      - key: MIN_BALANCE_USD
+        value: "50"
