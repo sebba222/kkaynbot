@@ -23,9 +23,6 @@ SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 AUTHORIZED_USER_ID = int(os.environ.get("AUTHORIZED_USER_ID", "0"))
 UYU_TZ = pytz.timezone("America/Montevideo")
 
-# Gemini
-
-model = genai.GenerativeModel("gemini-1.5-flash")
 
 # Google Sheets
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
