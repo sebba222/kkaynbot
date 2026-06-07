@@ -277,7 +277,8 @@ def setup_sheets():
 
 def update_global_summary():
     try:
-        ctx = get_sheets_context()
+        _sheets_cache["ts"] = 0  # Forzar lectura fresca
+        ctx = get_sheets_context(force_refresh=True)
         if not ctx: return
         ss = get_spreadsheet()
         ws_global = ss.worksheet("Global")
