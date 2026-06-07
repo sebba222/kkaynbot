@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Config
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 AUTHORIZED_USER_ID = int(os.environ.get("AUTHORIZED_USER_ID", "0"))
 UYU_TZ = pytz.timezone("America/Montevideo")
@@ -151,16 +151,21 @@ Ejemplos:
 - "gasté 40 en alfajor" → campos_faltantes: ["cuenta"] (falta la cuenta)
 """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1}
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
     }
-    resp = requests.post(url, json=payload, timeout=30)
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=30)
     if resp.status_code != 200:
-        raise Exception(f"Gemini API error {resp.status_code}: {resp.text[:200]}")
+        raise Exception(f"Groq API error {resp.status_code}: {resp.text[:200]}")
     data = resp.json()
-    text_response = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    text_response = data["choices"][0]["message"]["content"].strip()
     
     # Limpiar markdown si viene con backticks
     text_response = re.sub(r'```json\s*', '', text_response)
