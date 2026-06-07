@@ -522,6 +522,9 @@ REGLAS:
                 if r: resultados.append(r)
             except Exception as e:
                 resultados.append(f"❌ Error: {e}")
+        # Si hay muchos resultados, resumirlos
+        if len(resultados) > 3:
+            return f"✅ *{len(resultados)} operaciones ejecutadas correctamente.*\n" + respuesta
         return "\n\n".join(resultados) if resultados else respuesta
     elif accion:
         resultado = execute_action(accion)
