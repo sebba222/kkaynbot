@@ -406,6 +406,51 @@ def execute_action(action):
             f"  • Balance: $ {ctx['balance_mes']:,.2f}"]
         return "\n".join(lines)
 
+    elif tipo == "editar":
+        fila = action.get("fila")
+        if fila:
+            fila_int = int(fila)
+            all_data = ws.get_all_values()
+            if fila_int <= len(all_data):
+                row = all_data[fila_int - 1]
+                # Aplicar cambios
+                if "monto" in action:
+                    nuevo_monto = float(action["monto"])
+                    es_ingreso = bool(row[5]) if len(row) > 5 else False
+                    if es_ingreso:
+                        ws.update_cell(fila_int, 6, nuevo_monto)
+                        ws.update_cell(fila_int, 7, "")
+                    else:
+                        ws.update_cell(fila_int, 6, "")
+                        ws.update_cell(fila_int, 7, nuevo_monto)
+                if "descripcion" in action:
+                    ws.update_cell(fila_int, 2, action["descripcion"])
+                if "categoria" in action:
+                    ws.update_cell(fila_int, 3, action["categoria"])
+                if "cuenta" in action:
+                    ws.update_cell(fila_int, 4, action["cuenta"])
+                # Recalcular todos los saldos desde esa fila en adelante
+                all_data2 = ws.get_all_values()
+                for i, r in enumerate(all_data2[3:], start=4):
+                    if len(r) >= 7 and r[3]:
+                        cuenta_r = r[3]
+                        saldo = 0.0
+                        for prev in all_data2[3:i-1]:
+                            if len(prev) >= 8 and prev[3] == cuenta_r:
+                                saldo += (float(prev[5].replace(',','.')) if prev[5] else 0) - (float(prev[6].replace(',','.')) if prev[6] else 0)
+                        ing = float(r[5].replace(',','.')) if r[5] else 0
+                        eg = float(r[6].replace(',','.')) if r[6] else 0
+                        ws.update_cell(i, 8, round(saldo + ing - eg, 2))
+                # Limpiar Global y actualizar
+                ws_global = ss.worksheet("Global")
+                all_global = ws_global.get_all_values()
+                if len(all_global) >= 15:
+                    ws_global.batch_clear([f"A15:H{len(all_global) + 5}"])
+                update_global_summary()
+                desc = action.get("descripcion", all_data[fila_int-1][1] if len(all_data[fila_int-1]) > 1 else "movimiento")
+                return f"✅ *Editado correctamente*\n📝 {desc}"
+        return "❌ No pude identificar qué editar."
+
     return "❌ No entendí la operación."
 
 async def process_message(update: Update, user_message: str):
@@ -438,11 +483,14 @@ Tipos de acción:
 - transferencia: {{"tipo":"transferencia","cuenta_origen":"BBVA UYU","cuenta_destino":"Itaú UYU","monto":4000,"moneda":"UYU"}}
 - inversion: {{"tipo":"inversion","activo":"BTC","cuenta":"Itaú USD","monto":200,"moneda":"USD"}}
 - eliminar: {{"tipo":"eliminar","fila":NUMERO}} (buscá en ultimos_movimientos)
+- editar: {{"tipo":"editar","fila":NUMERO,"monto":3000}} o {{"tipo":"editar","fila":NUMERO,"categoria":"Transporte"}} o {{"tipo":"editar","fila":NUMERO,"descripcion":"nuevo nombre"}} (para corregir un registro existente, buscá la fila en ultimos_movimientos)
 - actualizar_saldo: {{"tipo":"actualizar_saldo","cuenta":"BBVA UYU","saldo":5000}}
 - resumen: {{"tipo":"resumen"}}
 
 REGLAS:
 - Si el usuario dice "el último", "ese", "lo que pusiste" → usá ultimos_movimientos
+- Si el usuario corrige un monto ("fueron 3k no 5k", "me equivoqué era 200") → usá "editar" con la fila correcta, NO elimines y agregues uno nuevo
+- Si el usuario quiere cambiar categoría, descripción o monto de algo ya registrado → usá "editar"
 - Si falta info crítica, preguntá antes de ejecutar
 - Respondé siempre en español rioplatense, conciso
 - Para múltiples operaciones (ej: "poné todas en 0") usá "acciones"
