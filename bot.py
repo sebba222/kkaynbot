@@ -135,11 +135,10 @@ def setup_sheets():
     existing = [ws.title for ws in ss.worksheets()]
 
     # ── GLOBAL ──
-    if "Global" not in existing:
-        ws = ss.add_worksheet(title="Global", rows=1000, cols=10)
-    else:
-        ws = ss.worksheet("Global")
-    ws.clear()
+    # Eliminar y recrear para evitar conflictos con merges anteriores
+    if "Global" in existing:
+        ss.del_worksheet(ss.worksheet("Global"))
+    ws = ss.add_worksheet(title="Global", rows=1000, cols=10)
     ws_id = ws._properties['sheetId']
 
     ws.update(values=[["💰  GESTIÓN FINANCIERA — SEBA RODRÍGUEZ"]], range_name="A1")
@@ -156,8 +155,6 @@ def setup_sheets():
     ws.update(values=[["FECHA", "DESCRIPCIÓN", "CATEGORÍA", "CUENTA", "MONEDA", "INGRESO", "EGRESO", "SALDO"]], range_name="A14")
 
     reqs = []
-    # Deshacer todos los merges existentes primero
-    reqs.append({"mergeCells": {"range": {"sheetId": ws_id, "startRowIndex": 0, "endRowIndex": 50, "startColumnIndex": 0, "endColumnIndex": 10}, "mergeType": "MERGE_NONE"}})
     # Fila 1 título
     reqs += [fmt_req(ws_id,1,1,1,8, bold=True, bg=AZUL_OSC, fg=TEXTO_BLA, size=14, align="CENTER"), merge_req(ws_id,1,1,1,8), row_h(ws_id,1,48)]
     # Fila 2 actualizado
@@ -191,11 +188,9 @@ def setup_sheets():
     ss.batch_update({"requests": reqs})
 
     # ── CUENTAS ──
-    if "Cuentas" not in existing:
-        ws2 = ss.add_worksheet(title="Cuentas", rows=1000, cols=8)
-    else:
-        ws2 = ss.worksheet("Cuentas")
-    ws2.clear()
+    if "Cuentas" in existing:
+        ss.del_worksheet(ss.worksheet("Cuentas"))
+    ws2 = ss.add_worksheet(title="Cuentas", rows=1000, cols=8)
     ws2_id = ws2._properties['sheetId']
     ws2.update(values=[["📋  REGISTRO DE MOVIMIENTOS — TODAS LAS CUENTAS"]], range_name="A1")
     ws2.update(values=[["FECHA","DESCRIPCIÓN","CATEGORÍA","CUENTA","MONEDA","INGRESO","EGRESO","SALDO"]], range_name="A3")
@@ -211,11 +206,9 @@ def setup_sheets():
     ss.batch_update({"requests": reqs2})
 
     # ── INVERSIONES ──
-    if "Inversiones" not in existing:
-        ws3 = ss.add_worksheet(title="Inversiones", rows=500, cols=7)
-    else:
-        ws3 = ss.worksheet("Inversiones")
-    ws3.clear()
+    if "Inversiones" in existing:
+        ss.del_worksheet(ss.worksheet("Inversiones"))
+    ws3 = ss.add_worksheet(title="Inversiones", rows=500, cols=7)
     ws3_id = ws3._properties['sheetId']
     ws3.update(values=[["📈  REGISTRO DE INVERSIONES"]], range_name="A1")
     ws3.update(values=[["FECHA","ACTIVO","MONTO","MONEDA","CUENTA ORIGEN","COTIZACIÓN","NOTAS"]], range_name="A3")
