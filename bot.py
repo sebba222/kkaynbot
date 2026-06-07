@@ -365,6 +365,13 @@ def execute_action(action):
             if fila_int <= len(all_data):
                 desc = all_data[fila_int-1][1] if len(all_data[fila_int-1]) > 1 else "movimiento"
                 ws.delete_rows(fila_int)
+                # Limpiar y reconstruir la tabla de movimientos en Global
+                ws_global = ss.worksheet("Global")
+                # Borrar desde fila 15 en adelante en Global
+                all_global = ws_global.get_all_values()
+                if len(all_global) >= 15:
+                    rows_to_clear = len(all_global) - 14
+                    ws_global.batch_clear([f"A15:H{14 + rows_to_clear + 10}"])
                 update_global_summary()
                 return f"✅ *Eliminado*: {desc}"
         return "❌ No pude identificar qué eliminar."
