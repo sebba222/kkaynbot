@@ -221,6 +221,73 @@ def setup_sheets():
            fmt_req(wi_id,3,1,3,7,bold=True,bg=MORADO_MED,fg=TEXTO_BLA,align="CENTER"),row_h(wi_id,3,26),
            {"updateSheetProperties":{"properties":{"sheetId":wi_id,"gridProperties":{"frozenRowCount":3}},"fields":"gridProperties.frozenRowCount"}},]
     ss.batch_update({"requests":reqs3})
+    # Por Cuenta
+    if "Por Cuenta" in existing:
+        ss.del_worksheet(ss.worksheet("Por Cuenta"))
+    wp = ss.add_worksheet("Por Cuenta", rows=500, cols=42)
+    wp_id = wp._properties['sheetId']
+    # Headers por cada cuenta (6 cuentas, 3 por fila, col separadora entre cada grupo)
+    # Fila 1: título general
+    wp.batch_update([
+        {"range":"A1","values":[["📊  MOVIMIENTOS POR CUENTA"]]},
+    ])
+    CUENTAS = ["BBVA UYU","BBVA USD","Itaú UYU","Itaú USD","Efectivo UYU","Efectivo USD"]
+    HEADERS = ["FECHA","DESCRIPCIÓN","CATEGORÍA","ING","EGR","SALDO"]
+    # Layout: 3 cuentas por fila, cada cuenta ocupa 6 cols, col 7 = separador
+    # Fila 1: 3 títulos de cuenta, fila 2: 3 headers, fila 3+: datos
+    # Primera fila de cuentas (BBVA UYU, BBVA USD, Itaú UYU) → cols A-S
+    # Segunda fila de cuentas (Itaú USD, Efectivo UYU, Efectivo USD) → empieza fila 4 después de espacio
+    col_starts = [1, 8, 15]  # columnas inicio para cada grupo (A, H, O)
+    reqs_p = []
+    # Fila 1: título general
+    reqs_p += [fmt_req(wp_id,1,1,1,21,bold=True,bg=AZUL_OSC,fg=TEXTO_BLA,size=13,align="CENTER"),
+               merge_req(wp_id,1,1,1,21), row_h(wp_id,1,45)]
+    for i, (cuenta, col) in enumerate(zip(CUENTAS[:3], col_starts)):
+        # Título de cuenta
+        reqs_p += [fmt_req(wp_id,2,col,2,col+5,bold=True,bg=TURQUESA,fg=TEXTO_BLA,size=11,align="CENTER"),
+                   merge_req(wp_id,2,col,2,col+5), row_h(wp_id,2,32)]
+        # Headers
+        reqs_p += [fmt_req(wp_id,3,col,3,col+5,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
+                   row_h(wp_id,3,26)]
+        # Columna separadora
+        if col < 15:
+            reqs_p += [fmt_req(wp_id,2,col+6,2,col+7,bg=BLANCO),
+                       fmt_req(wp_id,3,col+6,3,col+7,bg=BLANCO)]
+    # Segunda fila de cuentas empieza en fila 5 (con separador fila 4)
+    for i, (cuenta, col) in enumerate(zip(CUENTAS[3:], col_starts)):
+        reqs_p += [fmt_req(wp_id,5,col,5,col+5,bold=True,bg=TURQUESA,fg=TEXTO_BLA,size=11,align="CENTER"),
+                   merge_req(wp_id,5,col,5,col+5), row_h(wp_id,5,32)]
+        reqs_p += [fmt_req(wp_id,6,col,6,col+5,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
+                   row_h(wp_id,6,26)]
+        if col < 15:
+            reqs_p += [fmt_req(wp_id,5,col+6,5,col+7,bg=BLANCO),
+                       fmt_req(wp_id,6,col+6,6,col+7,bg=BLANCO)]
+    # Separador entre bloques
+    reqs_p += [fmt_req(wp_id,4,1,4,21,bg=BLANCO), row_h(wp_id,4,12)]
+    # Anchos de columna
+    for grupo in range(2):
+        for i, col in enumerate(col_starts):
+            actual_col = col + grupo * 0  # same cols
+            widths_p = [120, 180, 100, 90, 90, 90]
+            for j, w in enumerate(widths_p):
+                reqs_p.append(col_w(wp_id, col+j, w))
+        if grupo == 0: break  # cols are shared
+    # Separadores (cols 7 y 14)
+    for sep_col in [7, 14]:
+        reqs_p.append(col_w(wp_id, sep_col, 15))
+    ss.batch_update({"requests": reqs_p})
+    # Escribir títulos y headers
+    batch_vals = []
+    for i, (cuenta, col) in enumerate(zip(CUENTAS[:3], col_starts)):
+        col_letter = chr(64+col)
+        batch_vals.append({"range": f"{col_letter}2", "values": [[cuenta]]})
+        batch_vals.append({"range": f"{col_letter}3", "values": [HEADERS]})
+    for i, (cuenta, col) in enumerate(zip(CUENTAS[3:], col_starts)):
+        col_letter = chr(64+col)
+        batch_vals.append({"range": f"{col_letter}5", "values": [[cuenta]]})
+        batch_vals.append({"range": f"{col_letter}6", "values": [HEADERS]})
+    wp.batch_update(batch_vals)
+
     for h in ["Sheet1","Hoja 1","Hoja1","_temp_"]:
         try: ss.del_worksheet(ss.worksheet(h))
         except: pass
@@ -289,8 +356,50 @@ def update_global_summary():
         if reqs:
             ss.batch_update({"requests":reqs})
         invalidate_cache()
+        # También actualizar pestaña Por Cuenta
+        try:
+            update_por_cuenta()
+        except Exception as e:
+            logger.warning(f"update_por_cuenta: {e}")
     except Exception as e:
         logger.error(f"Error update_global: {e}")
+
+def update_por_cuenta():
+    """Actualiza la pestaña Por Cuenta con movimientos separados por cuenta."""
+    try:
+        ctx = get_sheets_context()
+        if not ctx: return
+        ss = get_spreadsheet()
+        wp = ss.worksheet("Por Cuenta")
+        wp_id = wp._properties['sheetId']
+        all_movs = ctx["all_movs"]
+        CUENTAS = ["BBVA UYU","BBVA USD","Itaú UYU","Itaú USD","Efectivo UYU","Efectivo USD"]
+        col_starts = [1, 8, 15]
+        # Limpiar datos previos (desde fila 4 para bloque 1, fila 7 para bloque 2)
+        wp.batch_clear(["A4:F200","H4:M200","O4:T200","A7:F200","H7:M200","O7:T200"])
+        reqs = []
+        for bloque in range(2):
+            cuentas_bloque = CUENTAS[bloque*3:(bloque+1)*3]
+            data_start_row = 4 if bloque == 0 else 7
+            for ci, (cuenta, col) in enumerate(zip(cuentas_bloque, col_starts)):
+                movs_cuenta = [[r[0],r[1],r[2],r[5],r[6],r[7]] 
+                               for r in all_movs if r[3]==cuenta]
+                if movs_cuenta:
+                    col_letter = chr(64+col)
+                    end_col_letter = chr(64+col+5)
+                    wp.update(values=movs_cuenta, range_name=f"{col_letter}{data_start_row}")
+                    for ri, row in enumerate(movs_cuenta):
+                        es_ing = bool(row[3])
+                        es_eg  = bool(row[4])
+                        fi = data_start_row + ri
+                        if es_ing and not es_eg:   bg,fg = VERDE_CLA,VERDE_OSC
+                        elif es_eg and not es_ing: bg,fg = ROJO_CLA,ROJO_OSC
+                        else:                      bg,fg = GRIS_CLA,TEXTO_OSC
+                        reqs.append(fmt_req(wp_id,fi,col,fi,col+5,bg=bg,fg=fg,align="CENTER"))
+        if reqs:
+            ss.batch_update({"requests":reqs})
+    except Exception as e:
+        logger.error(f"Error update_por_cuenta: {e}")
 
 # ── Groq ─────────────────────────────────────────────────────────────────────
 def call_groq(messages):
