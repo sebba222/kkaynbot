@@ -23,6 +23,7 @@ UYU_TZ = pytz.timezone("America/Montevideo")
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 CUENTAS_VALIDAS = ["BBVA UYU", "BBVA USD", "Itaú UYU", "Itaú USD", "Efectivo UYU", "Efectivo USD"]
 conversation_history = {}
+_sheets_cache = {"data": None, "ts": 0}
 
 def normalize_cuenta(nombre):
     """Normaliza el nombre de cuenta para evitar variaciones de tildes/mayúsculas"""
@@ -65,6 +66,22 @@ def get_sheets_client():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
+def sheets_retry(func, *args, retries=3, **kwargs):
+    """Ejecuta una operación de Sheets con retry automático ante 429"""
+    for attempt in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "RATE_LIMIT" in str(e):
+                if attempt < retries - 1:
+                    wait = (attempt + 1) * 15  # 15s, 30s, 45s
+                    logger.warning(f"Rate limit hit, esperando {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
+            else:
+                raise
+
 def get_usd_rate():
     try:
         r = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
@@ -85,7 +102,12 @@ def get_balance(ws, cuenta):
     except:
         return 0.0
 
-def get_sheets_context():
+def get_sheets_context(force_refresh=False):
+    import time as _time
+    global _sheets_cache
+    now = _time.time()
+    if not force_refresh and _sheets_cache["data"] and (now - _sheets_cache["ts"]) < 30:
+        return _sheets_cache["data"]
     try:
         ss = get_spreadsheet()
         ws = ss.worksheet("Cuentas")
@@ -109,7 +131,10 @@ def get_sheets_context():
                         if row[5]: ing_mes += float(row[5].replace(',','.'))
                         if row[6]: eg_mes += float(row[6].replace(',','.'))
                 except: pass
-        return {"saldos": saldos, "ultimos_movimientos": ultimos, "inversiones": inversiones, "usd_rate": usd_rate, "ingresos_mes": ing_mes, "egresos_mes": eg_mes, "balance_mes": ing_mes - eg_mes, "all_movimientos": [r for r in all_data[3:] if len(r) >= 7 and (r[5] or r[6])]}
+        result = {"saldos": saldos, "ultimos_movimientos": ultimos, "inversiones": inversiones, "usd_rate": usd_rate, "ingresos_mes": ing_mes, "egresos_mes": eg_mes, "balance_mes": ing_mes - eg_mes, "all_movimientos": [r for r in all_data[3:] if len(r) >= 7 and (r[5] or r[6])]}
+        _sheets_cache["data"] = result
+        _sheets_cache["ts"] = now
+        return result
     except Exception as e:
         logger.error(f"Error contexto: {e}")
         return {}
@@ -323,6 +348,8 @@ def update_global_summary():
 
         if reqs:
             ss.batch_update({"requests": reqs})
+        # Invalidar cache después de escribir
+        _sheets_cache["ts"] = 0
     except Exception as e:
         logger.error(f"Error update_global: {e}")
 
@@ -336,6 +363,7 @@ def execute_action(action):
     if tipo == "gasto":
         cuenta = normalize_cuenta(action["cuenta"]); monto = float(action["monto"]); moneda = action.get("moneda","UYU")
         saldo = get_balance(ws, cuenta) - monto
+        time.sleep(1)
         ws.append_row([fecha, action["descripcion"], action.get("categoria","Otro"), cuenta, moneda, "", monto, round(saldo,2)])
         update_global_summary()
         sym = "$" if "UYU" in moneda else "U$S"
@@ -344,6 +372,7 @@ def execute_action(action):
     elif tipo == "ingreso":
         cuenta = normalize_cuenta(action["cuenta"]); monto = float(action["monto"]); moneda = action.get("moneda","UYU")
         saldo = get_balance(ws, cuenta) + monto
+        time.sleep(1)
         ws.append_row([fecha, action["descripcion"], action.get("categoria","Sueldo"), cuenta, moneda, monto, "", round(saldo,2)])
         update_global_summary()
         sym = "$" if "UYU" in moneda else "U$S"
