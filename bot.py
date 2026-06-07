@@ -179,7 +179,7 @@ def setup_sheets():
     requests = []
 
     def rgb(r, g, b):
-    return {"red": r/255, "green": g/255, "blue": b/255}
+        return {"red": r/255, "green": g/255, "blue": b/255}
 
 def update_global_summary():
     ctx = get_sheets_context()
