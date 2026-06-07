@@ -494,7 +494,10 @@ REGLAS:
 - Si falta info crítica, preguntá antes de ejecutar
 - Respondé siempre en español rioplatense, conciso
 - Para múltiples operaciones (ej: "poné todas en 0") usá "acciones"
-- SOLO JSON válido, sin texto extra"""
+- SOLO JSON válido, sin texto extra
+- "saldo en X", "cuánto tengo en X", "cómo estoy en X" = CONSULTA, nunca acción. Respondé con el saldo actual.
+- "actualizar_saldo" SOLO cuando el usuario da un número explícito Y una intención clara de cambiar el saldo, ejemplo: "poné el saldo de BBVA en 5000" o "el saldo de Itaú es 3000". Si hay duda, preguntá.
+- NUNCA hagas actualizar_saldo sin que el usuario haya dado un número explícito."""
 
     conversation_history[user_id].append({"role": "user", "content": user_message})
     if len(conversation_history[user_id]) > 10:
