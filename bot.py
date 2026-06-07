@@ -116,6 +116,7 @@ def get_sheets_context(force=False):
 
 def invalidate_cache():
     _cache["ts"] = 0.0
+    _cache["data"] = None  # also clear data to avoid stale datetime objects
 
 # ── Formato Sheets ───────────────────────────────────────────────────────────
 def fmt_req(ws_id,r1,c1,r2,c2,bold=False,bg=None,fg=None,size=None,align=None):
@@ -147,6 +148,8 @@ def setup_sheets():
     ss = get_spreadsheet()
     existing = [ws.title for ws in ss.worksheets()]
     # Recrear hojas para evitar conflictos de merge
+    # Crear hoja temporal para que nunca quede el spreadsheet vacío
+    temp = ss.add_worksheet("_temp_", rows=1, cols=1)
     for title in ["Global","Cuentas","Inversiones"]:
         if title in existing:
             ss.del_worksheet(ss.worksheet(title))
@@ -218,10 +221,9 @@ def setup_sheets():
            fmt_req(wi_id,3,1,3,7,bold=True,bg=MORADO_MED,fg=TEXTO_BLA,align="CENTER"),row_h(wi_id,3,26),
            {"updateSheetProperties":{"properties":{"sheetId":wi_id,"gridProperties":{"frozenRowCount":3}},"fields":"gridProperties.frozenRowCount"}},]
     ss.batch_update({"requests":reqs3})
-    for h in ["Sheet1","Hoja 1","Hoja1"]:
-        if h in existing:
-            try: ss.del_worksheet(ss.worksheet(h))
-            except: pass
+    for h in ["Sheet1","Hoja 1","Hoja1","_temp_"]:
+        try: ss.del_worksheet(ss.worksheet(h))
+        except: pass
     invalidate_cache()
     return "✅ Diseño aplicado y todo reseteado. ¡Listo para empezar!"
 
