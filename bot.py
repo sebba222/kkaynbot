@@ -378,8 +378,13 @@ IMPORTANTE:
 - Sé conciso en las respuestas
 - Si es una consulta/análisis, respondé directamente sin acción
 
-Respondé SOLO con JSON válido, sin texto adicional:
-{{"accion": {{...}} o null, "respuesta": "tu mensaje"}}"""
+Cuando necesites hacer MÚLTIPLES acciones (ej: resetear varias cuentas, múltiples registros), usá "acciones" en lugar de "accion":
+{{"acciones": [{{...}}, {{...}}], "respuesta": "tu mensaje"}}
+
+Para acción única:
+{{"accion": {{...}} o null, "respuesta": "tu mensaje"}}
+
+Respondé SOLO con JSON válido, sin texto adicional."""
 
     # Agregar mensaje del usuario al historial
     conversation_history[user_id].append({"role": "user", "content": user_message})
@@ -398,13 +403,27 @@ Respondé SOLO con JSON válido, sin texto adicional:
     
     parsed = json.loads(response_text)
     accion = parsed.get("accion")
+    acciones = parsed.get("acciones")  # lista de acciones
     respuesta = parsed.get("respuesta", "")
     
     # Agregar respuesta al historial
     conversation_history[user_id].append({"role": "assistant", "content": response_text})
     
-    # Ejecutar acción si hay una
-    if accion:
+    # Ejecutar múltiples acciones
+    if acciones and isinstance(acciones, list):
+        resultados = []
+        for a in acciones:
+            try:
+                r = execute_action(a)
+                if r:
+                    resultados.append(r)
+            except Exception as e:
+                resultados.append(f"❌ Error en acción: {e}")
+        if resultados:
+            return "\n\n".join(resultados)
+    
+    # Ejecutar acción única
+    elif accion:
         resultado = execute_action(accion)
         if resultado:
             return resultado
