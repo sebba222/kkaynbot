@@ -114,5 +114,11 @@ def update_por_cuenta():
             rqs += [fr(wpc, cur, 1, cur, NCOLS, bg=BLANCO), rh(wpc, cur, 10)]
             cur += 1
 
+    # Unmerge primero para que los merges viejos no interfieran con la nueva estructura,
+    # luego aplicar formato, luego escribir valores.
+    unmerge = {"unmergeCells": {"range": {
+        "sheetId": wpc, "startRowIndex": 1, "endRowIndex": 500,
+        "startColumnIndex": 0, "endColumnIndex": 16
+    }}}
+    if rqs: sp.batch_update({"requests": [unmerge] + rqs})
     if bv: wp.batch_update(bv)
-    if rqs: sp.batch_update({"requests": rqs})
