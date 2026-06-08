@@ -158,17 +158,17 @@ def setup_sheets():
     sp.batch_update({"requests":rqs})
 
     # ── 2. POR CUENTA ──
-    # Layout: 3 bloques verticales (BBVA arriba, Itaú en medio, Efectivo abajo)
-    # Cada bloque: header banco | subheaders UYU/USD/TOTAL | col-headers | filas de datos
-    # Cols: 1-6=UYU, 7=sep, 8-13=USD, 14=sep, 15-18=TOTALES
-    wp=sp.add_worksheet("Por Cuenta",rows=500,cols=17)
+    # Cols: 1-6=UYU, 7=sep(14px), 8-13=USD, 14=sep(14px), 15=SAL UYU, 16=SAL USD
+    # Total = 16 cols. Sheet needs cols=16, format refs max col 16.
+    wp=sp.add_worksheet("Por Cuenta",rows=500,cols=16)
     wpc=wp._properties['sheetId']
     wp.update(values=[["📊  MOVIMIENTOS POR CUENTA"]], range_name="A1")
-    rqp=[fr(wpc,1,1,1,18,bold=True,bg=AZ_OSC,fg=T_BLA,sz=14,al="CENTER"),
-         mg(wpc,1,1,1,18),rh(wpc,1,48),
+    rqp=[fr(wpc,1,1,1,16,bold=True,bg=AZ_OSC,fg=T_BLA,sz=14,al="CENTER"),
+         mg(wpc,1,1,1,16),rh(wpc,1,48),
          cw(wpc,7,14),cw(wpc,14,14)]  # separadores
     for j,w in enumerate([125,190,108,88,88,92]): rqp+=[cw(wpc,1+j,w),cw(wpc,8+j,w)]
-    for j,w in enumerate([95,95,95,95]): rqp.append(cw(wpc,15+j,w))
+    # Totales: solo 2 cols (15 y 16)
+    rqp+=[cw(wpc,15,115),cw(wpc,16,115)]
     sp.batch_update({"requests":rqp})
 
     # ── 3. INVERSIONES ──
