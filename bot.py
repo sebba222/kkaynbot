@@ -231,47 +231,20 @@ def setup_sheets():
     wp = ss.add_worksheet("Por Cuenta", rows=500, cols=18)
     wp_id = wp._properties['sheetId']
 
-    reqs_p = []
-    # Fila 1: título principal
-    reqs_p += [fmt_req(wp_id,1,1,1,18,bold=True,bg=AZUL_OSC,fg=TEXTO_BLA,size=14,align="CENTER"),
-               merge_req(wp_id,1,1,1,18), row_h(wp_id,1,48)]
-    # Fila 2: sub-headers de secciones (UYU | USD | TOTAL)
-    reqs_p += [
-        fmt_req(wp_id,2,1,2,6,bold=True,bg=AZUL_MED,fg=TEXTO_BLA,size=11,align="CENTER"), merge_req(wp_id,2,1,2,6),
-        fmt_req(wp_id,2,7,2,7,bg=BLANCO), col_w(wp_id,7,12),
-        fmt_req(wp_id,2,8,2,13,bold=True,bg=AZUL_MED,fg=TEXTO_BLA,size=11,align="CENTER"), merge_req(wp_id,2,8,2,13),
-        fmt_req(wp_id,2,14,2,14,bg=BLANCO), col_w(wp_id,14,12),
-        fmt_req(wp_id,2,15,2,18,bold=True,bg=TURQUESA,fg=TEXTO_BLA,size=11,align="CENTER"), merge_req(wp_id,2,15,2,18),
-        row_h(wp_id,2,30),
+    # Solo título y anchos — update_por_cuenta escribe el resto dinámicamente
+    reqs_p = [
+        fmt_req(wp_id,1,1,1,18,bold=True,bg=AZUL_OSC,fg=TEXTO_BLA,size=14,align="CENTER"),
+        merge_req(wp_id,1,1,1,18),
+        row_h(wp_id,1,48),
+        col_w(wp_id,7,12), col_w(wp_id,14,12),  # separadores
     ]
-    # Fila 3: headers de columnas
-    H_MOV = ["FECHA","DESCRIPCIÓN","CATEGORÍA","INGRESO","EGRESO","SALDO"]
-    H_TOT = ["SAL UYU","SAL USD","TODO UYU","TODO USD"]
-    reqs_p += [fmt_req(wp_id,3,1,3,6,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
-               fmt_req(wp_id,3,8,3,13,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
-               fmt_req(wp_id,3,15,3,18,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
-               fmt_req(wp_id,3,7,3,7,bg=BLANCO), fmt_req(wp_id,3,14,3,14,bg=BLANCO),
-               row_h(wp_id,3,26)]
-    # Anchos columnas UYU (1-6) y USD (8-13)
-    for col_offset in [0, 7]:
-        for j, w in enumerate([120,180,100,85,85,90]):
-            reqs_p.append(col_w(wp_id, 1+col_offset+j, w))
-    # Anchos TOTAL (15-18)
-    for j, w in enumerate([90,90,90,90]):
-        reqs_p.append(col_w(wp_id, 15+j, w))
-    # Freeze fila 3
-    reqs_p.append({"updateSheetProperties":{"properties":{"sheetId":wp_id,"gridProperties":{"frozenRowCount":3}},"fields":"gridProperties.frozenRowCount"}})
+    for j, w in enumerate([120,185,105,88,88,92]):
+        reqs_p.append(col_w(wp_id, 1+j, w))    # UYU cols 1-6
+        reqs_p.append(col_w(wp_id, 8+j, w))    # USD cols 8-13
+    for j, w in enumerate([95,95,95,95]):
+        reqs_p.append(col_w(wp_id, 15+j, w))   # TOTAL cols 15-18
     ss.batch_update({"requests":reqs_p})
-    # Escribir contenido fijo
-    wp.batch_update([
-        {"range":"A1","values":[["📊  MOVIMIENTOS POR CUENTA — BBVA  |  ITAÚ  |  EFECTIVO"]]},
-        {"range":"A2","values":[["PESOS (UYU)"]]},
-        {"range":"H2","values":[["DÓLARES (USD)"]]},
-        {"range":"O2","values":[["TOTALES"]]},
-        {"range":"A3","values":[H_MOV]},
-        {"range":"H3","values":[H_MOV]},
-        {"range":"O3","values":[H_TOT]},
-    ])
+    wp.update(values=[["📊  MOVIMIENTOS POR CUENTA — BBVA  |  ITAÚ  |  EFECTIVO"]], range_name="A1")
 
     for h in ["Sheet1","Hoja 1","Hoja1","_temp_"]:
         try: ss.del_worksheet(ss.worksheet(h))
