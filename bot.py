@@ -159,7 +159,7 @@ def setup_sheets():
     # Layout: 3 bloques verticales (BBVA arriba, Itaú en medio, Efectivo abajo)
     # Cada bloque: header banco | subheaders UYU/USD/TOTAL | col-headers | filas de datos
     # Cols: 1-6=UYU, 7=sep, 8-13=USD, 14=sep, 15-18=TOTALES
-    wp=sp.add_worksheet("Por Cuenta",rows=500,cols=16)
+    wp=sp.add_worksheet("Por Cuenta",rows=500,cols=17)
     wpc=wp._properties['sheetId']
     wp.update(values=[["📊  MOVIMIENTOS POR CUENTA"]], range_name="A1")
     rqp=[fr(wpc,1,1,1,18,bold=True,bg=AZ_OSC,fg=T_BLA,sz=14,al="CENTER"),
