@@ -111,7 +111,9 @@ def col_letter(n): return chr(64+n) if n<=26 else chr(64+n//26)+chr(64+n%26)
 def setup_sheets():
     sp=ss(); existing=[w.title for w in sp.worksheets()]
     # Orden deseado: Global, Por Cuenta, Inversiones, Cuentas
-    # Crear temp para no quedar sin hojas
+    # Crear temp para no quedar sin hojas (borrar si ya existe)
+    try: sp.del_worksheet(sp.worksheet("_t_"))
+    except: pass
     temp=sp.add_worksheet("_t_",1,1)
     for t in ["Global","Por Cuenta","Inversiones","Cuentas"]:
         if t in existing:
