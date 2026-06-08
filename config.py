@@ -7,6 +7,8 @@ SPREADSHEET_ID     = os.environ.get("SPREADSHEET_ID")
 AUTHORIZED_USER_ID = int(os.environ.get("AUTHORIZED_USER_ID", "0"))
 MIN_BALANCE_UYU    = float(os.environ.get("MIN_BALANCE_UYU", "500"))
 MIN_BALANCE_USD    = float(os.environ.get("MIN_BALANCE_USD", "50"))
+WEBHOOK_URL        = os.environ.get("WEBHOOK_URL", "")      # ej: https://kkaynbot.railway.app
+PORT               = int(os.environ.get("PORT", "8443"))
 
 UYU_TZ  = pytz.timezone("America/Montevideo")
 SCOPES  = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
