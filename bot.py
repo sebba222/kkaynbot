@@ -160,7 +160,7 @@ def setup_sheets():
     # ── 2. POR CUENTA ──
     # Cols: 1-6=UYU, 7=sep(14px), 8-13=USD, 14=sep(14px), 15=SAL UYU, 16=SAL USD
     # Total = 16 cols. Sheet needs cols=16, format refs max col 16.
-    wp=sp.add_worksheet("Por Cuenta",rows=500,cols=16)
+    wp=sp.add_worksheet("Por Cuenta",rows=500,cols=17)
     wpc=wp._properties['sheetId']
     wp.update(values=[["📊  MOVIMIENTOS POR CUENTA"]], range_name="A1")
     rqp=[fr(wpc,1,1,1,16,bold=True,bg=AZ_OSC,fg=T_BLA,sz=14,al="CENTER"),
@@ -186,7 +186,7 @@ def setup_sheets():
     ]})
 
     # ── 4. CUENTAS (storage) ──
-    wc=sp.add_worksheet("Cuentas",rows=1000,cols=8)
+    wc=sp.add_worksheet("Cuentas",rows=1000,cols=9)
     wci=wc._properties['sheetId']
     wc.batch_update([
         {"range":"A1","values":[["📋  REGISTRO DE MOVIMIENTOS — STORAGE"]]},
