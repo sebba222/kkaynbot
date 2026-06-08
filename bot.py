@@ -222,71 +222,56 @@ def setup_sheets():
            {"updateSheetProperties":{"properties":{"sheetId":wi_id,"gridProperties":{"frozenRowCount":3}},"fields":"gridProperties.frozenRowCount"}},]
     ss.batch_update({"requests":reqs3})
     # Por Cuenta
+    # Layout: 3 bancos (BBVA, Itaú, Efectivo) en filas
+    # Cada banco tiene 3 secciones: UYU (cols A-F) | SEP | USD (cols H-M) | SEP | TOTAL (cols O-P)
+    # Fila 1: título | Fila 2: sub-headers UYU/USD/TOTAL | Fila 3: headers columnas
+    # Fila 4+: datos BBVA | Fila N+2: separador | Fila N+3+: datos Itaú | etc.
     if "Por Cuenta" in existing:
         ss.del_worksheet(ss.worksheet("Por Cuenta"))
-    wp = ss.add_worksheet("Por Cuenta", rows=500, cols=42)
+    wp = ss.add_worksheet("Por Cuenta", rows=500, cols=18)
     wp_id = wp._properties['sheetId']
-    # Headers por cada cuenta (6 cuentas, 3 por fila, col separadora entre cada grupo)
-    # Fila 1: título general
-    wp.batch_update([
-        {"range":"A1","values":[["📊  MOVIMIENTOS POR CUENTA"]]},
-    ])
-    CUENTAS = ["BBVA UYU","BBVA USD","Itaú UYU","Itaú USD","Efectivo UYU","Efectivo USD"]
-    HEADERS = ["FECHA","DESCRIPCIÓN","CATEGORÍA","ING","EGR","SALDO"]
-    # Layout: 3 cuentas por fila, cada cuenta ocupa 6 cols, col 7 = separador
-    # Fila 1: 3 títulos de cuenta, fila 2: 3 headers, fila 3+: datos
-    # Primera fila de cuentas (BBVA UYU, BBVA USD, Itaú UYU) → cols A-S
-    # Segunda fila de cuentas (Itaú USD, Efectivo UYU, Efectivo USD) → empieza fila 4 después de espacio
-    col_starts = [1, 8, 15]  # columnas inicio para cada grupo (A, H, O)
+
     reqs_p = []
-    # Fila 1: título general
-    reqs_p += [fmt_req(wp_id,1,1,1,21,bold=True,bg=AZUL_OSC,fg=TEXTO_BLA,size=13,align="CENTER"),
-               merge_req(wp_id,1,1,1,21), row_h(wp_id,1,45)]
-    for i, (cuenta, col) in enumerate(zip(CUENTAS[:3], col_starts)):
-        # Título de cuenta
-        reqs_p += [fmt_req(wp_id,2,col,2,col+5,bold=True,bg=TURQUESA,fg=TEXTO_BLA,size=11,align="CENTER"),
-                   merge_req(wp_id,2,col,2,col+5), row_h(wp_id,2,32)]
-        # Headers
-        reqs_p += [fmt_req(wp_id,3,col,3,col+5,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
-                   row_h(wp_id,3,26)]
-        # Columna separadora
-        if col < 15:
-            reqs_p += [fmt_req(wp_id,2,col+6,2,col+7,bg=BLANCO),
-                       fmt_req(wp_id,3,col+6,3,col+7,bg=BLANCO)]
-    # Segunda fila de cuentas empieza en fila 5 (con separador fila 4)
-    for i, (cuenta, col) in enumerate(zip(CUENTAS[3:], col_starts)):
-        reqs_p += [fmt_req(wp_id,5,col,5,col+5,bold=True,bg=TURQUESA,fg=TEXTO_BLA,size=11,align="CENTER"),
-                   merge_req(wp_id,5,col,5,col+5), row_h(wp_id,5,32)]
-        reqs_p += [fmt_req(wp_id,6,col,6,col+5,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
-                   row_h(wp_id,6,26)]
-        if col < 15:
-            reqs_p += [fmt_req(wp_id,5,col+6,5,col+7,bg=BLANCO),
-                       fmt_req(wp_id,6,col+6,6,col+7,bg=BLANCO)]
-    # Separador entre bloques
-    reqs_p += [fmt_req(wp_id,4,1,4,21,bg=BLANCO), row_h(wp_id,4,12)]
-    # Anchos de columna
-    for grupo in range(2):
-        for i, col in enumerate(col_starts):
-            actual_col = col + grupo * 0  # same cols
-            widths_p = [120, 180, 100, 90, 90, 90]
-            for j, w in enumerate(widths_p):
-                reqs_p.append(col_w(wp_id, col+j, w))
-        if grupo == 0: break  # cols are shared
-    # Separadores (cols 7 y 14)
-    for sep_col in [7, 14]:
-        reqs_p.append(col_w(wp_id, sep_col, 15))
-    ss.batch_update({"requests": reqs_p})
-    # Escribir títulos y headers
-    batch_vals = []
-    for i, (cuenta, col) in enumerate(zip(CUENTAS[:3], col_starts)):
-        col_letter = chr(64+col)
-        batch_vals.append({"range": f"{col_letter}2", "values": [[cuenta]]})
-        batch_vals.append({"range": f"{col_letter}3", "values": [HEADERS]})
-    for i, (cuenta, col) in enumerate(zip(CUENTAS[3:], col_starts)):
-        col_letter = chr(64+col)
-        batch_vals.append({"range": f"{col_letter}5", "values": [[cuenta]]})
-        batch_vals.append({"range": f"{col_letter}6", "values": [HEADERS]})
-    wp.batch_update(batch_vals)
+    # Fila 1: título principal
+    reqs_p += [fmt_req(wp_id,1,1,1,18,bold=True,bg=AZUL_OSC,fg=TEXTO_BLA,size=14,align="CENTER"),
+               merge_req(wp_id,1,1,1,18), row_h(wp_id,1,48)]
+    # Fila 2: sub-headers de secciones (UYU | USD | TOTAL)
+    reqs_p += [
+        fmt_req(wp_id,2,1,2,6,bold=True,bg=AZUL_MED,fg=TEXTO_BLA,size=11,align="CENTER"), merge_req(wp_id,2,1,2,6),
+        fmt_req(wp_id,2,7,2,7,bg=BLANCO), col_w(wp_id,7,12),
+        fmt_req(wp_id,2,8,2,13,bold=True,bg=AZUL_MED,fg=TEXTO_BLA,size=11,align="CENTER"), merge_req(wp_id,2,8,2,13),
+        fmt_req(wp_id,2,14,2,14,bg=BLANCO), col_w(wp_id,14,12),
+        fmt_req(wp_id,2,15,2,18,bold=True,bg=TURQUESA,fg=TEXTO_BLA,size=11,align="CENTER"), merge_req(wp_id,2,15,2,18),
+        row_h(wp_id,2,30),
+    ]
+    # Fila 3: headers de columnas
+    H_MOV = ["FECHA","DESCRIPCIÓN","CATEGORÍA","INGRESO","EGRESO","SALDO"]
+    H_TOT = ["SAL UYU","SAL USD","TODO UYU","TODO USD"]
+    reqs_p += [fmt_req(wp_id,3,1,3,6,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
+               fmt_req(wp_id,3,8,3,13,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
+               fmt_req(wp_id,3,15,3,18,bold=True,bg=GRIS_OSC,fg=TEXTO_BLA,align="CENTER"),
+               fmt_req(wp_id,3,7,3,7,bg=BLANCO), fmt_req(wp_id,3,14,3,14,bg=BLANCO),
+               row_h(wp_id,3,26)]
+    # Anchos columnas UYU (1-6) y USD (8-13)
+    for col_offset in [0, 7]:
+        for j, w in enumerate([120,180,100,85,85,90]):
+            reqs_p.append(col_w(wp_id, 1+col_offset+j, w))
+    # Anchos TOTAL (15-18)
+    for j, w in enumerate([90,90,90,90]):
+        reqs_p.append(col_w(wp_id, 15+j, w))
+    # Freeze fila 3
+    reqs_p.append({"updateSheetProperties":{"properties":{"sheetId":wp_id,"gridProperties":{"frozenRowCount":3}},"fields":"gridProperties.frozenRowCount"}})
+    ss.batch_update({"requests":reqs_p})
+    # Escribir contenido fijo
+    wp.batch_update([
+        {"range":"A1","values":[["📊  MOVIMIENTOS POR CUENTA — BBVA  |  ITAÚ  |  EFECTIVO"]]},
+        {"range":"A2","values":[["PESOS (UYU)"]]},
+        {"range":"H2","values":[["DÓLARES (USD)"]]},
+        {"range":"O2","values":[["TOTALES"]]},
+        {"range":"A3","values":[H_MOV]},
+        {"range":"H3","values":[H_MOV]},
+        {"range":"O3","values":[H_TOT]},
+    ])
 
     for h in ["Sheet1","Hoja 1","Hoja1","_temp_"]:
         try: ss.del_worksheet(ss.worksheet(h))
