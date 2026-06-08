@@ -414,8 +414,15 @@ def exe(action):
 
     elif t=="transferencia":
         o=nc(action["cuenta_origen"]); d=nc(action["cuenta_destino"]); m=float(action["monto"]); mo=action.get("moneda","UYU")
+        # Calcular saldos con datos frescos
         so=bal(data,o)-m; sd=bal(data,d)+m
+        # Registrar egreso en origen
         with_retry(wc.append_row, [fecha,f"Transferencia a {d}","Transferencia",o,mo,"",m,round(so,2)])
+        # Pequeña pausa y leer datos frescos para calcular saldo destino correctamente
+        time.sleep(1)
+        data2=wc.get_all_values()
+        sd=bal(data2,d)+m
+        # Registrar ingreso en destino
         with_retry(wc.append_row, [fecha,f"Transferencia desde {o}","Transferencia",d,mo,m,"",round(sd,2)])
         update_global(); sym="$" if "UYU" in mo else "U$S"
         return f"✅ *Transferencia*\n📤 {o}: {sym} {so:,.2f}\n📥 {d}: {sym} {sd:,.2f}\n💱 {sym} {m:,.2f}"
