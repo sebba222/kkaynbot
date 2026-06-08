@@ -1,7 +1,7 @@
 import logging
 
 from config import BANCOS
-from kkaynbot.sheets.client import get_ctx, ss
+from kkaynbot.sheets.client import get_ctx, ss, get_ws
 from kkaynbot.sheets.format import fr, mg, cw, rh
 from kkaynbot.sheets.theme import (AZ_OSC, AZ_MED, AZ_CLA, TURQ, VD_OSC, VD_CLA,
                                     RJ_OSC, RJ_CLA, GR_OSC, GR_CLA, BLANCO, T_BLA, T_OSC)
@@ -21,7 +21,7 @@ def update_por_cuenta():
     ctx = get_ctx()
     if not ctx: return
     sp = ss()
-    try: wp = sp.worksheet("Por Cuenta")
+    try: wp = get_ws("Por Cuenta")
     except: return
     wpc = wp._properties['sheetId']
     s = ctx["saldos"]; rate = ctx["rate"]; movs = ctx["movs"]

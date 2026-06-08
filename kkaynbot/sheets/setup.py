@@ -1,4 +1,4 @@
-from kkaynbot.sheets.client import ss, inv_cache
+from kkaynbot.sheets.client import ss, inv_cache, reset_ws
 from kkaynbot.sheets.format import fr, mg, cw, rh
 from kkaynbot.sheets.theme import (AZ_OSC, AZ_MED, AZ_CLA, TURQ, GR_OSC, GR_CLA,
                                     BLANCO, T_BLA, T_OSC, MORADO, MOR_MED)
@@ -94,4 +94,5 @@ def setup_sheets():
         except: pass
 
     inv_cache()
+    reset_ws()
     return "✅ Todo listo. Orden: Global → Por Cuenta → Inversiones → Cuentas\nCargá tu primer movimiento y la pestaña Por Cuenta se construirá automáticamente."
