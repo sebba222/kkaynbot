@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def exe(action):
     t = action.get("tipo"); sp = ss(); wc = sp.worksheet("Cuentas")
     fecha = datetime.now(UYU_TZ).strftime("%d/%m/%Y %H:%M")
-    data = wc.get_all_values()
+    ctx_pre = get_ctx(); data = ctx_pre.get("data", []) if ctx_pre else with_retry(wc.get_all_values)
 
     if t == "gasto":
         c = nc(action["cuenta"]); m = float(action["monto"]); mo = action.get("moneda", "UYU")
@@ -32,8 +32,6 @@ def exe(action):
         so = bal(data, o) - m; sd = bal(data, d) + m
         with_retry(wc.append_row, [fecha, f"Transferencia a {d}", "Transferencia", o, mo, "", m, round(so, 2)])
         time.sleep(1)
-        data2 = wc.get_all_values()
-        sd = bal(data2, d) + m
         with_retry(wc.append_row, [fecha, f"Transferencia desde {o}", "Transferencia", d, mo, m, "", round(sd, 2)])
         update_global(); sym = "$" if "UYU" in mo else "U$S"
         return f"✅ *Transferencia*\n📤 {o}: {sym} {so:,.2f}\n📥 {d}: {sym} {sd:,.2f}\n💱 {sym} {m:,.2f}"
@@ -53,8 +51,7 @@ def exe(action):
             if fi <= len(data):
                 desc = data[fi-1][1] if len(data[fi-1]) > 1 else "movimiento"
                 wc.delete_rows(fi)
-                wg = sp.worksheet("Global"); ag = wg.get_all_values()
-                if len(ag) >= 15: wg.batch_clear([f"A15:H{len(ag)+5}"])
+                sp.worksheet("Global").batch_clear(["A15:H500"])
                 update_global()
                 return f"✅ *Eliminado*: {desc}"
         return "❌ No pude identificar qué eliminar."
@@ -75,7 +72,7 @@ def exe(action):
                 if "categoria"   in action: upd.append({"range": f"C{fi}", "values": [[action["categoria"]]]})
                 if "cuenta"      in action: upd.append({"range": f"D{fi}", "values": [[nc(action["cuenta"])]]})
                 if upd: wc.batch_update(upd)
-                time.sleep(1); fresh = wc.get_all_values(); spc = {}; cu = []
+                time.sleep(1); fresh = with_retry(wc.get_all_values); spc = {}; cu = []
                 for idx in range(3, len(fresh)):
                     r = fresh[idx]
                     if len(r) >= 7 and r[3]:
@@ -86,8 +83,7 @@ def exe(action):
                 for i in range(0, len(cu), 50):
                     wc.batch_update(cu[i:i+50])
                     if i+50 < len(cu): time.sleep(1)
-                wg = sp.worksheet("Global"); ag = wg.get_all_values()
-                if len(ag) >= 15: wg.batch_clear([f"A15:H{len(ag)+5}"])
+                sp.worksheet("Global").batch_clear(["A15:H500"])
                 update_global()
                 return f"✅ *Editado*: {action.get('descripcion', desc_o)}"
         return "❌ No pude identificar qué editar."
