@@ -88,6 +88,23 @@ def get_ctx(force=False):
 
 def inv_cache(): _cache["ts"]=0.0; _cache["data"]=None
 
+def with_retry(func, *args, max_retries=3, **kwargs):
+    """Ejecuta una función con retry automático ante 429."""
+    for attempt in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "RESOURCE_EXHAUSTED" in err or "RATE_LIMIT" in err:
+                wait = 15 * (attempt + 1)
+                logger.warning(f"Rate limit (intento {attempt+1}), esperando {wait}s...")
+                time.sleep(wait)
+                if attempt == max_retries - 1:
+                    raise
+            else:
+                raise
+    return None
+
 # ── Formato helpers ────────────────────────────────────────────────────────────
 def fr(sid,r1,c1,r2,c2,bold=False,bg=None,fg=None,sz=None,al=None):
     fmt={}; tf={}
@@ -205,10 +222,7 @@ def setup_sheets():
         except: pass
 
     inv_cache()
-    # Construir estructura inicial de Por Cuenta
-    try: update_por_cuenta()
-    except: pass
-    return "✅ Todo listo. Orden: Global → Por Cuenta → Inversiones → Cuentas"
+    return "✅ Todo listo. Orden: Global → Por Cuenta → Inversiones → Cuentas\nCargá tu primer movimiento y la pestaña Por Cuenta se construirá automáticamente."
 
 # ── UPDATE GLOBAL ──────────────────────────────────────────────────────────────
 def update_global():
@@ -221,7 +235,7 @@ def update_global():
         tu=sum(v for k,v in s.items() if "UYU" in k)
         td=sum(v for k,v in s.items() if "USD" in k)
         now=datetime.now(UYU_TZ)
-        wg.batch_update([
+        with_retry(wg.batch_update, [
             {"range":"B2","values":[[now.strftime("%d/%m/%Y %H:%M")]]},
             {"range":"A5","values":[[f"$ {tu:,.0f}",f"U$S {td:,.2f}",f"$ {tu+td*rate:,.0f}",f"U$S {tu/rate+td:,.2f}" if rate else "U$S 0",f"$ {rate:.2f}"]]},
             {"range":"A9", "values":[["Ingresos",f"$ {ctx['iu']:,.0f}","",f"U$S {ctx['id']:,.2f}",""]]},
@@ -401,8 +415,8 @@ def exe(action):
     elif t=="transferencia":
         o=nc(action["cuenta_origen"]); d=nc(action["cuenta_destino"]); m=float(action["monto"]); mo=action.get("moneda","UYU")
         so=bal(data,o)-m; sd=bal(data,d)+m
-        wc.append_row([fecha,f"Transferencia a {d}","Transferencia",o,mo,"",m,round(so,2)])
-        wc.append_row([fecha,f"Transferencia desde {o}","Transferencia",d,mo,m,"",round(sd,2)])
+        with_retry(wc.append_row, [fecha,f"Transferencia a {d}","Transferencia",o,mo,"",m,round(so,2)])
+        with_retry(wc.append_row, [fecha,f"Transferencia desde {o}","Transferencia",d,mo,m,"",round(sd,2)])
         update_global(); sym="$" if "UYU" in mo else "U$S"
         return f"✅ *Transferencia*\n📤 {o}: {sym} {so:,.2f}\n📥 {d}: {sym} {sd:,.2f}\n💱 {sym} {m:,.2f}"
 
