@@ -1,32 +1,30 @@
-from kkaynbot.sheets.client import ss, inv_cache, reset_ws
+from kkaynbot.sheets.client import ss, inv_cache, reset_ws, get_ws
 from kkaynbot.sheets.format import fr, mg, cw, rh
 from kkaynbot.sheets.theme import (AZ_OSC, AZ_MED, AZ_CLA, TURQ, GR_OSC, GR_CLA,
                                     BLANCO, T_BLA, T_OSC, MORADO, MOR_MED)
 
+
 def setup_sheets():
-    sp = ss(); existing = [w.title for w in sp.worksheets()]
-    try: sp.del_worksheet(sp.worksheet("_t_"))
-    except: pass
-    temp = sp.add_worksheet("_t_", 1, 1)
-    for t in ["Global", "Por Cuenta", "Inversiones", "Cuentas"]:
-        if t in existing:
-            try: sp.del_worksheet(sp.worksheet(t))
-            except: pass
+    """Actualiza la estructura y el diseño. Preserva los datos existentes."""
+    sp = ss()
+    existing = {w.title: w for w in sp.worksheets()}
 
     # ── 1. GLOBAL ──
-    wg = sp.add_worksheet("Global", rows=500, cols=10)
+    if "Global" not in existing:
+        wg = sp.add_worksheet("Global", rows=500, cols=10)
+    else:
+        wg = existing["Global"]
     sid = wg._properties['sheetId']
     wg.batch_update([
         {"range": "A1", "values": [["💰  GESTIÓN FINANCIERA — SEBA RODRÍGUEZ"]]},
         {"range": "A2", "values": [["Actualizado:", ""]]},
         {"range": "A3", "values": [["SALDOS TOTALES"]]},
         {"range": "A4", "values": [["Total UYU", "Total USD", "Todo en UYU", "Todo en USD", "Cotización USD/UYU"]]},
-        {"range": "A5", "values": [["", "", "", "", ""]]},
         {"range": "A7", "values": [["RESUMEN DEL MES"]]},
         {"range": "A8", "values": [["", "PESOS (UYU)", "", "DÓLARES (USD)", ""]]},
-        {"range": "A9", "values": [["Ingresos", "", "", "", ""]]},
-        {"range": "A10", "values": [["Egresos", "", "", "", ""]]},
-        {"range": "A11", "values": [["Balance", "", "", "", ""]]},
+        {"range": "A9", "values": [["Ingresos"]]},
+        {"range": "A10", "values": [["Egresos"]]},
+        {"range": "A11", "values": [["Balance"]]},
         {"range": "A13", "values": [["TODOS LOS MOVIMIENTOS"]]},
         {"range": "A14", "values": [["FECHA", "DESCRIPCIÓN", "CATEGORÍA", "CUENTA", "MONEDA", "INGRESO", "EGRESO", "SALDO"]]},
     ])
@@ -51,7 +49,10 @@ def setup_sheets():
     sp.batch_update({"requests": rqs})
 
     # ── 2. POR CUENTA ──
-    wp = sp.add_worksheet("Por Cuenta", rows=500, cols=17)
+    if "Por Cuenta" not in existing:
+        wp = sp.add_worksheet("Por Cuenta", rows=500, cols=17)
+    else:
+        wp = existing["Por Cuenta"]
     wpc = wp._properties['sheetId']
     wp.update(values=[["📊  MOVIMIENTOS POR CUENTA"]], range_name="A1")
     rqp = [fr(wpc,1,1,1,16,bold=True,bg=AZ_OSC,fg=T_BLA,sz=14,al="CENTER"),
@@ -62,7 +63,10 @@ def setup_sheets():
     sp.batch_update({"requests": rqp})
 
     # ── 3. INVERSIONES ──
-    wi = sp.add_worksheet("Inversiones", rows=500, cols=7)
+    if "Inversiones" not in existing:
+        wi = sp.add_worksheet("Inversiones", rows=500, cols=7)
+    else:
+        wi = existing["Inversiones"]
     wii = wi._properties['sheetId']
     wi.batch_update([
         {"range": "A1", "values": [["📈  REGISTRO DE INVERSIONES"]]},
@@ -76,7 +80,10 @@ def setup_sheets():
     ]})
 
     # ── 4. CUENTAS (storage) ──
-    wc = sp.add_worksheet("Cuentas", rows=1000, cols=9)
+    if "Cuentas" not in existing:
+        wc = sp.add_worksheet("Cuentas", rows=1000, cols=9)
+    else:
+        wc = existing["Cuentas"]
     wci = wc._properties['sheetId']
     wc.batch_update([
         {"range": "A1", "values": [["📋  REGISTRO DE MOVIMIENTOS — STORAGE"]]},
@@ -89,10 +96,37 @@ def setup_sheets():
     for i, w in enumerate([135, 220, 120, 120, 75, 105, 105, 110]): rqc.append(cw(wci, i+1, w))
     sp.batch_update({"requests": rqc})
 
+    # Limpiar hojas temporales o basura
     for h in ["_t_", "Sheet1", "Hoja 1", "Hoja1"]:
         try: sp.del_worksheet(sp.worksheet(h))
         except: pass
 
     inv_cache()
     reset_ws()
-    return "✅ Todo listo. Orden: Global → Por Cuenta → Inversiones → Cuentas\nCargá tu primer movimiento y la pestaña Por Cuenta se construirá automáticamente."
+    nuevas = [t for t in ["Global", "Por Cuenta", "Inversiones", "Cuentas"] if t not in existing]
+    if nuevas:
+        return f"✅ Estructura lista. Pestañas creadas: {', '.join(nuevas)}\nTus datos existentes fueron preservados."
+    return "✅ Estructura y diseño actualizados. Datos preservados."
+
+
+def reiniciar_sheets():
+    """Borra todos los registros y pone los saldos en cero. La estructura queda intacta."""
+    wc = get_ws("Cuentas")
+    wi = get_ws("Inversiones")
+    wg = get_ws("Global")
+    wp = get_ws("Por Cuenta")
+
+    wc.batch_clear(["A4:H1000"])
+    wi.batch_clear(["A4:G1000"])
+    wg.batch_clear(["A15:H500"])
+    wg.batch_update([
+        {"range": "A5",  "values": [["", "", "", "", ""]]},
+        {"range": "B9",  "values": [["", "", "", ""]]},
+        {"range": "B10", "values": [["", "", "", ""]]},
+        {"range": "B11", "values": [["", "", "", ""]]},
+        {"range": "B2",  "values": [["—"]]},
+    ])
+    wp.batch_clear(["A2:P500"])
+
+    inv_cache()
+    return "✅ Todos los registros eliminados. Saldos en cero.\nLa estructura de las pestañas quedó intacta."

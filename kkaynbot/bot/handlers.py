@@ -3,7 +3,7 @@ import logging
 from config import AUTHORIZED_USER_ID, CUENTAS, conversation_history
 from kkaynbot.sheets.client import get_ctx
 from kkaynbot.sheets.actions import exe
-from kkaynbot.sheets.setup import setup_sheets
+from kkaynbot.sheets.setup import setup_sheets, reiniciar_sheets
 from kkaynbot.ai.groq import process_msg
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,12 @@ async def cmd_saldo(u, c):
             sym = "$" if "UYU" in c_ else "U$S"; lines.append(f"• {c_}: {sym} {s.get(c_, 0):,.2f}")
         lines.append(f"\n💱 1 USD = $ {rate:.2f}")
         await u.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    except Exception as e: await u.message.reply_text(f"❌ {e}")
+
+async def cmd_reiniciar(u, c):
+    if u.effective_user.id != AUTHORIZED_USER_ID: return
+    await u.message.reply_text("🗑️ Borrando todos los registros...")
+    try: await u.message.reply_text(reiniciar_sheets())
     except Exception as e: await u.message.reply_text(f"❌ {e}")
 
 async def cmd_limpiar(u, c):

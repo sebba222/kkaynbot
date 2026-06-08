@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import TELEGRAM_TOKEN, UYU_TZ, WEBHOOK_URL, PORT
-from kkaynbot.bot.handlers import start, cmd_setup, cmd_resumen, cmd_saldo, cmd_limpiar, handle_msg
+from kkaynbot.bot.handlers import start, cmd_setup, cmd_resumen, cmd_saldo, cmd_limpiar, cmd_reiniciar, handle_msg
 from kkaynbot.bot.scheduler import weekly_report, check_balance
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -79,6 +79,7 @@ def main():
     app.add_handler(CommandHandler("resumen", cmd_resumen))
     app.add_handler(CommandHandler("saldo", cmd_saldo))
     app.add_handler(CommandHandler("limpiar", cmd_limpiar))
+    app.add_handler(CommandHandler("reiniciar", cmd_reiniciar))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
 
     if WEBHOOK_URL:
