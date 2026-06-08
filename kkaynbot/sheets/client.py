@@ -7,18 +7,27 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 from config import SCOPES, SPREADSHEET_ID, CUENTAS, UYU_TZ
-from kkaynbot.utils.helpers import sf, bal, usd_rate
+from kkaynbot.utils.helpers import sf, bal, usd_rate, with_retry
 
 logger = logging.getLogger(__name__)
 
 _cache = {"ts": 0.0, "data": None}
+_gs_client = None  # singleton — se crea una sola vez y se reutiliza
 
 def gs_client():
-    return gspread.authorize(Credentials.from_service_account_info(
-        json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON")), scopes=SCOPES))
+    global _gs_client
+    if _gs_client is None:
+        _gs_client = gspread.authorize(Credentials.from_service_account_info(
+            json.loads(os.environ.get("GOOGLE_CREDENTIALS_JSON")), scopes=SCOPES))
+    return _gs_client
 
 def ss():
-    return gs_client().open_by_key(SPREADSHEET_ID)
+    global _gs_client
+    try:
+        return gs_client().open_by_key(SPREADSHEET_ID)
+    except Exception:
+        _gs_client = None  # fuerza re-auth en el próximo intento
+        raise
 
 def get_ctx(force=False):
     global _cache
@@ -26,7 +35,9 @@ def get_ctx(force=False):
     if not force and _cache["data"] and (now - _cache["ts"]) < 20:
         return _cache["data"]
     try:
-        sp = ss(); wc = sp.worksheet("Cuentas"); data = wc.get_all_values()
+        sp = ss()
+        wc = sp.worksheet("Cuentas")
+        data = with_retry(wc.get_all_values)
         saldos = {c: bal(data, c) for c in CUENTAS}
         ult = []
         for i, r in enumerate(data[3:], start=4):
@@ -37,7 +48,7 @@ def get_ctx(force=False):
         ult = ult[-10:]
         wi = sp.worksheet("Inversiones")
         inv = [{"activo": r[1], "monto": r[2], "moneda": r[3], "fecha": r[0]}
-               for r in wi.get_all_values()[3:] if len(r) >= 4 and r[1]]
+               for r in with_retry(wi.get_all_values)[3:] if len(r) >= 4 and r[1]]
         rate = usd_rate(); now_dt = datetime.now(UYU_TZ)
         iu = eu = id_ = ed = 0.0
         for r in data[3:]:

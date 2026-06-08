@@ -27,7 +27,11 @@ async def cmd_resumen(u, c):
 async def cmd_saldo(u, c):
     if u.effective_user.id != AUTHORIZED_USER_ID: return
     try:
-        ctx = get_ctx(force=True); s = ctx.get("saldos", {}); rate = ctx.get("rate", 40)
+        ctx = get_ctx(force=True)
+        if not ctx:
+            await u.message.reply_text("⏳ Sheets no disponible, intentá en unos segundos.")
+            return
+        s = ctx.get("saldos", {}); rate = ctx.get("rate", 40)
         lines = ["💳 *SALDOS ACTUALES*\n"]
         for c_ in CUENTAS:
             sym = "$" if "UYU" in c_ else "U$S"; lines.append(f"• {c_}: {sym} {s.get(c_, 0):,.2f}")
