@@ -23,6 +23,8 @@ _STORAGE_HEADERS = ["FECHA", "PLATAFORMA", "ACTIVO", "MONTO", "MONEDA",
 _SECTION_BG = {"BINANCE": MOR_MED, "XTB": AZ_MED}
 _MAX_ACTIVOS = max(len(c["activos"]) for c in INVERSIONES.values())
 _NCOLS = _MAX_ACTIVOS * 3 - 1  # 2 cols por activo + 1 separador entre bloques
+_MIN_DATA_ROWS = 3             # filas de registro reservadas por activo (el resto se scrollea)
+_SEP_COL_PX = 30               # ancho del separador entre bloques de activos
 
 
 # ────────────────────────────── creación / storage ──────────────────────────────
@@ -72,10 +74,10 @@ def setup_display_header(w) -> None:
            {"updateSheetProperties": {"properties": {"sheetId": sid,
             "gridProperties": {"frozenRowCount": 1}}, "fields": "gridProperties.frozenRowCount"}}]
     for i in range(_MAX_ACTIVOS):
-        rqs.append(cw(sid, 3 * i + 1, 96))   # FECHA
-        rqs.append(cw(sid, 3 * i + 2, 82))   # MONTO
+        rqs.append(cw(sid, 3 * i + 1, 100))  # FECHA
+        rqs.append(cw(sid, 3 * i + 2, 86))   # MONTO
         if i < _MAX_ACTIVOS - 1:
-            rqs.append(cw(sid, 3 * i + 3, 16))  # separador
+            rqs.append(cw(sid, 3 * i + 3, _SEP_COL_PX))  # separador
     ss().batch_update({"requests": rqs})
 
 
@@ -131,6 +133,7 @@ def _build_layout(sid: int, recs: dict):
     rqs = []  # requests de formato
     cur = 3   # fila 1 = título, fila 2 = spacer
 
+    totales = investment_totals(recs)
     for plataforma, cfg in INVERSIONES.items():
         activos = cfg["activos"]
         width = len(activos) * 3 - 1
@@ -141,7 +144,7 @@ def _build_layout(sid: int, recs: dict):
         # ── fila: encabezado de sección ──
         bv.append({"range": f"A{cur}", "values": [[f"{icono}  {plataforma} — {cfg['tipo']} ({moneda})"]]})
         rqs += [fr(sid, cur, 1, cur, width, bold=True, bg=sec_bg, fg=T_BLA, sz=12, al="CENTER"),
-                mg(sid, cur, 1, cur, width), rh(sid, cur, 30)]
+                mg(sid, cur, 1, cur, width), rh(sid, cur, 32)]
         cur += 1
 
         # ── fila: títulos de cada activo ──
@@ -150,7 +153,15 @@ def _build_layout(sid: int, recs: dict):
             bv.append({"range": f"{col_letter(c)}{cur}", "values": [[a]]})
             rqs += [fr(sid, cur, c, cur, c + 1, bold=True, bg=TURQ, fg=T_BLA, sz=11, al="CENTER"),
                     mg(sid, cur, c, cur, c + 1)]
-        rqs.append(rh(sid, cur, 26))
+        rqs.append(rh(sid, cur, 28))
+        cur += 1
+
+        # ── fila: TOTAL por activo (arriba, siempre visible) ──
+        for i, a in enumerate(activos):
+            c = 3 * i + 1
+            bv.append({"range": f"{col_letter(c)}{cur}", "values": [["TOTAL", totales.get(a, 0.0)]]})
+            rqs.append(fr(sid, cur, c, cur, c + 1, bold=True, bg=AZ_CLA, fg=AZ_OSC, al="CENTER"))
+        rqs.append(rh(sid, cur, 28))
         cur += 1
 
         # ── fila: encabezados de columna (FECHA | MONTO) ──
@@ -158,15 +169,15 @@ def _build_layout(sid: int, recs: dict):
             c = 3 * i + 1
             bv.append({"range": f"{col_letter(c)}{cur}", "values": [["FECHA", "MONTO"]]})
             rqs.append(fr(sid, cur, c, cur, c + 1, bold=True, bg=GR_OSC, fg=T_BLA, al="CENTER"))
-        rqs.append(rh(sid, cur, 22))
+        rqs.append(rh(sid, cur, 24))
         cur += 1
 
-        # ── filas de datos (cada activo crece independiente; se rellena parejo) ──
-        maxlen = max([len(recs.get(a, [])) for a in activos] + [1])
+        # ── filas de datos: más nuevas primero, ventana mínima de 3 filas ──
+        maxlen = max([len(recs.get(a, [])) for a in activos] + [_MIN_DATA_ROWS])
         data_start = cur
         for i, a in enumerate(activos):
             c = 3 * i + 1
-            lst = recs.get(a, [])
+            lst = list(reversed(recs.get(a, [])))  # storage viene viejo→nuevo; mostramos nuevo→viejo
             for j in range(maxlen):
                 fila = data_start + j
                 if j < len(lst):
@@ -178,21 +189,12 @@ def _build_layout(sid: int, recs: dict):
                 else:
                     rqs.append(fr(sid, fila, c, fila, c + 1, bg=BLANCO))
         for j in range(maxlen):
-            rqs.append(rh(sid, data_start + j, 22))
+            rqs.append(rh(sid, data_start + j, 24))
         cur = data_start + maxlen
 
-        # ── fila: total por activo ──
-        totales = investment_totals(recs)
-        for i, a in enumerate(activos):
-            c = 3 * i + 1
-            bv.append({"range": f"{col_letter(c)}{cur}", "values": [["TOTAL", totales.get(a, 0.0)]]})
-            rqs.append(fr(sid, cur, c, cur, c + 1, bold=True, bg=AZ_CLA, fg=AZ_OSC, al="CENTER"))
-        rqs.append(rh(sid, cur, 26))
-        cur += 1
-
-        # ── 2 filas separadoras entre secciones ──
-        for _ in range(2):
-            rqs += [fr(sid, cur, 1, cur, _NCOLS, bg=BLANCO), rh(sid, cur, 10)]
+        # ── 3 filas separadoras entre secciones ──
+        for _ in range(3):
+            rqs += [fr(sid, cur, 1, cur, _NCOLS, bg=BLANCO), rh(sid, cur, 14)]
             cur += 1
 
     return bv, rqs
