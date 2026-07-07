@@ -9,7 +9,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 from config import (CACHE_TTL_SECONDS, CUENTAS, GOOGLE_CREDENTIALS_JSON,
-                    SCOPES, SPREADSHEET_ID, ULT_MOVS_LIMIT, UYU_TZ)
+                    INV_STORAGE_TAB, SCOPES, SPREADSHEET_ID, ULT_MOVS_LIMIT, UYU_TZ)
 from kkaynbot.utils.helpers import bal, sf, usd_rate, with_retry
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,26 @@ def _reset_connection() -> None:
     reset_ws()
 
 
+def _leer_inversiones() -> list:
+    """Totales por activo desde el storage de inversiones. Tolera que la pestaña no exista.
+
+    Se aísla en su propio try/except para que una pestaña faltante (pre-migración)
+    no invalide todo el contexto financiero.
+    """
+    try:
+        wi = get_ws(INV_STORAGE_TAB)
+        filas = with_retry(wi.get_all_values)[3:]
+    except Exception:
+        return []
+    tot: dict = {}
+    for r in filas:
+        if len(r) >= 4 and r[2].strip():
+            m = sf(r[3])
+            if m > 0:
+                tot[r[2].strip().upper()] = tot.get(r[2].strip().upper(), 0.0) + m
+    return [{"activo": a, "total": round(t, 2), "moneda": "USD"} for a, t in tot.items()]
+
+
 def get_ctx(force: bool = False) -> dict:
     """Contexto financiero completo (saldos, movimientos, inversiones, cotización).
 
@@ -93,9 +113,7 @@ def get_ctx(force: bool = False) -> dict:
                             "cuenta": r[3], "moneda": r[4], "ingreso": r[5], "egreso": r[6],
                             "saldo": r[7] if len(r) > 7 else ""})
         ult = ult[-ULT_MOVS_LIMIT:]
-        wi = get_ws("Inversiones")
-        inv = [{"activo": r[1], "monto": r[2], "moneda": r[3], "fecha": r[0]}
-               for r in with_retry(wi.get_all_values)[3:] if len(r) >= 4 and r[1]]
+        inv = _leer_inversiones()
         rate = usd_rate()
         now_dt = datetime.now(UYU_TZ)
         iu = eu = id_ = ed = 0.0

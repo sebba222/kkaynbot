@@ -7,6 +7,38 @@ o automáticamente la primera vez que se necesitan.
 
 ---
 
+## Migración a Oracle Cloud (posterior a v6)
+
+- `main.py` quedó solo en modo **polling** (se sacó toda la lógica de webhook/PORT de Railway).
+- Las credenciales de Google se leen de `credentials.json` si no está la variable de entorno
+  (configurable con `GOOGLE_CREDENTIALS_FILE`).
+- Shim `run_blocking` (`kkaynbot/utils/aio.py`) para compatibilidad con Python 3.8 (Ubuntu 20.04).
+- Se borraron `railway.toml`, `render.yaml`, `runtime.txt`; mensajes de error apuntan a
+  `journalctl -u kkaynbot`.
+
+## Rediseño de la pestaña Inversiones (posterior a v6)
+
+La pestaña **Inversiones** pasó de ser una lista plana a una **vista por plataforma**,
+que se reconstruye sola desde un storage nuevo (**Inv Data**), igual que "Por Cuenta"
+se arma desde "Cuentas". La migración es automática con `/setup` (los activos
+reconocidos del formato viejo se pasan al nuevo).
+
+- **Dos secciones verticales**: 🪙 BINANCE (Bitcoin, Ethereum, Solana) y 📊 XTB
+  (SP500, QQQ, Oro, Nvidia).
+- **Bloques horizontales** por activo (FECHA + MONTO) con **total invertido** acumulado.
+  Al mandar *"invertí 100 en BTC"* se agrega la fila y sube el total del activo.
+- **Descuento diferenciado por plataforma**:
+  - XTB (compra directa con tarjeta) → descuenta de la cuenta USD que indiques.
+  - Binance (compra por P2P) → NO toca tus cuentas; el USDT lo registrás aparte
+    (ej: *"compré 200 USDT por P2P con Itaú"*).
+- Alias entendidos: BTC/Bitcoin, ETH/Ethereum, SOL/Solana, SP500/S&P, QQQ/Nasdaq,
+  Oro/Gold, Nvidia/NVDA (con tolerancia a typos).
+- Archivos: nuevo `kkaynbot/sheets/inversiones.py`; cambios en `config.py`,
+  `utils/normalize.py` (`resolve_activo`), `sheets/client.py`, `sheets/actions.py`,
+  `sheets/setup.py`, `ai/prompt.py`.
+
+---
+
 ## Fase 2 — Robustez y manejo de errores
 
 ### El bot ya no se congela (`asyncio.to_thread`)

@@ -11,14 +11,16 @@ import unicodedata
 from datetime import datetime
 from typing import Callable, Dict
 
-from config import BUDGET_WARN_PCT, CUENTAS, UYU_TZ
+from config import BUDGET_WARN_PCT, CUENTAS, INVERSIONES, UYU_TZ
 from kkaynbot.bot.reports import (gastos_mes_por_categoria, saldos_query_msg,
                                   top_categorias_lines)
 from kkaynbot.sheets.client import get_ctx, get_ws, inv_cache
 from kkaynbot.sheets.config_tab import get_config, set_budget, set_goal
 from kkaynbot.sheets.global_view import update_global
+from kkaynbot.sheets.inversiones import (add_investment, investment_totals,
+                                         update_inversiones_view)
 from kkaynbot.utils.helpers import bal, parse_amount, sf, usd_rate, with_retry
-from kkaynbot.utils.normalize import nc
+from kkaynbot.utils.normalize import nc, resolve_activo
 
 logger = logging.getLogger(__name__)
 
@@ -167,22 +169,49 @@ def _transferencia(action: dict) -> str:
 
 
 def _inversion(action: dict) -> str:
-    a = action.get("activo") or "inversión"
+    plataforma, activo = resolve_activo(action.get("activo"))
+    if not activo:
+        raise ValueError(
+            f"No reconozco el activo '{action.get('activo')}'. "
+            f"Cripto (Binance): BTC, ETH, SOL. Acciones (XTB): SP500, QQQ, Oro, Nvidia."
+        )
     m = _monto(action)
-    co = _cuenta(action)
-    mo = _moneda_de(co)
+    cfg = INVERSIONES[plataforma]
+    mo = cfg["moneda"]
     rate = usd_rate()
-    wi = get_ws("Inversiones")
-    wc = get_ws("Cuentas")
     fecha = _fecha_ahora()
-    with_retry(wi.append_row, [fecha, a, m, mo, co, rate, action.get("descripcion", "")])
-    time.sleep(PAUSA_ENTRE_ESCRITURAS)
-    s = bal(_data_fresca(), co) - m
-    with_retry(wc.append_row, [fecha, f"Inversión en {a}", "Inversión", co, mo, "", m, round(s, 2)])
-    update_global()
-    sym = _sym(mo)
-    return (f"✅ *Inversión*\n📈 {a}\n💸 {sym} {m:,.2f}\n"
-            f"🏦 {co}\n💰 Saldo: {sym} {s:,.2f}")
+    sym = "U$S"
+
+    if cfg["descuenta"]:
+        # XTB: compra directa con tarjeta → sale de una cuenta USD real
+        co = _cuenta(action)
+        if _moneda_de(co) != "USD":
+            raise ValueError(
+                "Las acciones de XTB se compran en dólares; decime desde qué cuenta USD "
+                "(BBVA USD o Itaú USD)."
+            )
+        add_investment(fecha, plataforma, activo, m, mo, co, rate, action.get("descripcion", ""))
+        wc = get_ws("Cuentas")
+        s = bal(_data_fresca(), co) - m
+        with_retry(wc.append_row,
+                   [fecha, f"Inversión {activo} (XTB)", "Inversión", co, mo, "", m, round(s, 2)])
+        update_global()
+        update_inversiones_view()
+        total = investment_totals().get(activo, 0.0)
+        return (f"✅ *Inversión registrada*\n📈 {activo} · {plataforma}\n"
+                f"💵 {sym} {m:,.2f}\n🧮 Total en {activo}: {sym} {total:,.2f}\n"
+                f"🏦 Desde {co} · saldo {sym} {s:,.2f}")
+
+    # BINANCE: se compra el USDT por P2P (ese gasto se registra aparte) → no toca cuentas
+    co = nc(action.get("cuenta"), "USD") if action.get("cuenta") else ""
+    if co not in CUENTAS:
+        co = ""
+    add_investment(fecha, plataforma, activo, m, mo, co, rate, action.get("descripcion", ""))
+    update_inversiones_view()
+    total = investment_totals().get(activo, 0.0)
+    return (f"✅ *Inversión registrada*\n📈 {activo} · {plataforma}\n"
+            f"💵 {sym} {m:,.2f}\n🧮 Total en {activo}: {sym} {total:,.2f}\n"
+            f"ℹ️ No toqué tus cuentas (el USDT lo cargás con la compra P2P).")
 
 
 def _recalc_saldos(wc) -> None:

@@ -60,6 +60,32 @@ SCOPES  = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleap
 CUENTAS = ["BBVA UYU", "BBVA USD", "Itaú UYU", "Itaú USD", "Efectivo UYU", "Efectivo USD"]
 BANCOS  = [("BBVA", "BBVA UYU", "BBVA USD"), ("ITAÚ", "Itaú UYU", "Itaú USD"), ("EFECTIVO", "Efectivo UYU", "Efectivo USD")]
 
+# ── Inversiones ──
+# "Inversiones" es la pestaña de VISTA (se rearma sola); "Inv Data" es el storage crudo.
+INV_STORAGE_TAB = "Inv Data"
+INV_DISPLAY_TAB = "Inversiones"
+# Dos plataformas, cada una con sus activos. "descuenta": si al invertir se resta
+# de una cuenta USD (XTB: compra directa con tarjeta) o no (Binance: se compra
+# el USDT por P2P y ese gasto se registra aparte).
+INVERSIONES = {
+    "BINANCE": {"tipo": "Criptomonedas", "moneda": "USD", "descuenta": False,
+                "activos": ["BITCOIN", "ETHEREUM", "SOLANA"]},
+    "XTB":     {"tipo": "Acciones",      "moneda": "USD", "descuenta": True,
+                "activos": ["SP500", "QQQ", "ORO", "NVIDIA"]},
+}
+# Cómo escribe Seba cada activo → nombre canónico
+INV_ALIASES = {
+    "btc": "BITCOIN", "bitcoin": "BITCOIN", "xbt": "BITCOIN",
+    "eth": "ETHEREUM", "ethereum": "ETHEREUM", "etherium": "ETHEREUM", "ether": "ETHEREUM",
+    "sol": "SOLANA", "solana": "SOLANA",
+    "sp500": "SP500", "sp": "SP500", "spx": "SP500", "s&p": "SP500", "s&p500": "SP500", "sp 500": "SP500",
+    "qqq": "QQQ", "nasdaq": "QQQ", "nasdaq100": "QQQ",
+    "oro": "ORO", "gold": "ORO", "xau": "ORO",
+    "nvidia": "NVIDIA", "nvda": "NVIDIA",
+}
+# activo canónico → plataforma
+ACTIVO_PLATAFORMA = {a: p for p, c in INVERSIONES.items() for a in c["activos"]}
+
 conversation_history: dict = {}
 
 

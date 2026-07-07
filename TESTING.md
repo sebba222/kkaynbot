@@ -1,15 +1,16 @@
 # TESTING — KkaynBot v6
 
 Guía de pruebas manuales por Telegram. Orden recomendado: de arriba hacia abajo.
-Antes de todo, deployá en Railway y mirá los logs del arranque.
+Antes de todo: `sudo systemctl restart kkaynbot` en la VM y `journalctl -u kkaynbot -f`.
 
 ## 0. Arranque y migración
 
 | Prueba | Esperado |
 |---|---|
-| Deploy con todas las env vars | Log `🤖 KkaynBot v6!` y `Webhook configurado exitosamente` |
-| Deploy borrando `GROQ_API_KEY` (probar y restaurar) | El container muere al toque con `❌ Configuración incompleta... GROQ_API_KEY` |
-| `/setup` | Crea las pestañas **Config** y **Cotización** sin tocar las 4 existentes; responde qué creó |
+| `systemctl restart kkaynbot` | Log `🤖 KkaynBot v6 (polling) arriba` y `Modo polling` |
+| Sacar `GROQ_API_KEY` del service file (probar y restaurar) | El servicio no arranca: `❌ Configuración incompleta... GROQ_API_KEY` |
+| Borrar/renombrar `credentials.json` (probar y restaurar) | No arranca: reporta que falta `GOOGLE_CREDENTIALS_JSON (variable o archivo ...)` |
+| `/setup` | Crea **Config**, **Cotización**, **Inv Data** y rearma **Inversiones** por plataforma; responde qué creó y cuántas inversiones migró |
 | `/start` | Muestra la ayuda con los comandos nuevos |
 
 ## 1. Registro con montos raros (parsing)
@@ -66,6 +67,28 @@ gasté 500 en juegos con bbva      → registra y avisa 🚨 que te pasaste
 /presupuesto borrar Ocio          → lo elimina
 ```
 Verificar en Sheets: pestaña Config, columnas A-B.
+
+## 5b. Inversiones (vista por plataforma)
+
+Verificar la pestaña **Inversiones**: dos secciones (BINANCE arriba, XTB abajo), cada
+activo en su bloque horizontal con FECHA/MONTO y un TOTAL.
+
+```
+invertí 100 en btc          → suma a BITCOIN; total sube; NO toca cuentas (avisa lo del P2P)
+invertí 50 dólares en eth   → nueva fila en ETHEREUM
+metí 200 en sp500 con itau  → registra en SP500 Y descuenta U$S 200 de Itaú USD
+invertí 100 en nvidia       → pregunta de qué cuenta USD sale (XTB descuenta)
+invertí 30 en dogecoin      → error: activo no reconocido, lista los válidos
+compré 200 usdt por p2p con itau → gasto normal U$S 200 de Itaú USD (categoría Cambio)
+```
+
+| Verificar | Esperado |
+|---|---|
+| Pestaña Inversiones | BINANCE (Bitcoin/Ethereum/Solana) y XTB (SP500/QQQ/Oro/Nvidia), lado a lado con espacio |
+| Total por activo | BITCOIN acumula (100 + siguientes); coincide con lo invertido |
+| `/saldo` tras "metí 200 en sp500 con itau" | Itaú USD bajó U$S 200 |
+| `/saldo` tras "invertí 100 en btc" | Ninguna cuenta cambió |
+| Pestaña Inv Data | Storage crudo con FECHA, PLATAFORMA, ACTIVO, MONTO... (no tocar a mano) |
 
 ## 6. Metas
 

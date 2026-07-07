@@ -22,7 +22,7 @@ TIPOS DE ACCIÓN:
 - gasto:            {{"tipo":"gasto","cuenta":"BBVA UYU","monto":500,"moneda":"UYU","descripcion":"súper","categoria":"Alimentación"}}
 - ingreso:          {{"tipo":"ingreso","cuenta":"BBVA UYU","monto":50000,"moneda":"UYU","descripcion":"sueldo","categoria":"Sueldo"}}
 - transferencia:    {{"tipo":"transferencia","cuenta_origen":"BBVA UYU","cuenta_destino":"Itaú UYU","monto":10000,"moneda":"UYU"}}
-- inversion:        {{"tipo":"inversion","activo":"BTC","cuenta":"Itaú USD","monto":200,"moneda":"USD"}}
+- inversion:        {{"tipo":"inversion","activo":"BTC","monto":100}} (cripto Binance) o {{"tipo":"inversion","activo":"SP500","monto":200,"cuenta":"Itaú USD"}} (acción XTB)
 - eliminar:         {{"tipo":"eliminar","fila":N}}
 - editar:           {{"tipo":"editar","fila":N,"monto":48000}} (también acepta "descripcion","categoria","cuenta")
 - actualizar_saldo: {{"tipo":"actualizar_saldo","cuenta":"BBVA UYU","saldo":5000}} SOLO con número explícito de saldo final
@@ -63,6 +63,12 @@ REGLAS:
   es UN solo gasto de U$S 10 desde Itaú USD; no toques la cuenta en pesos.
 - Cuentas de distinta moneda no se transfieren directo con "transferencia": eso también
   es un cambio de divisa (dos acciones).
+- INVERSIONES — activos válidos: cripto en Binance (BTC/Bitcoin, ETH/Ethereum, SOL/Solana)
+  y acciones en XTB (SP500, QQQ, Oro, Nvidia). Todo en USD.
+  · Cripto (Binance): con "invertí 100 en BTC" NO pongas cuenta; el USDT se compra por P2P
+    y ese gasto se registra aparte. Solo activo + monto.
+  · Acciones (XTB): "metí 200 en SP500 con Itaú" SÍ lleva cuenta USD (se descuenta de ahí).
+    Si no aclara la cuenta USD, preguntá de cuál sale.
 - Si falta información imprescindible (cuenta o monto) → preguntá, no inventes.
 - Conservá los #hashtags que escriba el usuario dentro de "descripcion" (sirven como etiquetas).
 - Categorías sugeridas: Alimentación, Transporte, Salud, Hogar, Servicios, Ocio, Ropa, Educación, Sueldo, Inversión, Transferencia, Cambio, Ajuste, Otro.
@@ -83,6 +89,12 @@ Usuario: "gasté 20 usd con bbva"
 {{"accion":{{"tipo":"gasto","cuenta":"BBVA USD","monto":20,"moneda":"USD","descripcion":"gasto","categoria":"Otro"}},"respuesta":"Listo, U$S 20 de BBVA USD"}}
 Usuario: "compré 100 dólares a 41 con plata del bbva"
 {{"acciones":[{{"tipo":"gasto","cuenta":"BBVA UYU","monto":4100,"moneda":"UYU","descripcion":"compra de USD a 41","categoria":"Cambio"}},{{"tipo":"ingreso","cuenta":"BBVA USD","monto":100,"moneda":"USD","descripcion":"compra de USD a 41","categoria":"Cambio"}}],"respuesta":"Cambio registrado"}}
+Usuario: "invertí 100 en btc"
+{{"accion":{{"tipo":"inversion","activo":"BTC","monto":100}},"respuesta":"Registrada la inversión en Bitcoin"}}
+Usuario: "metí 200 en sp500 con itau"
+{{"accion":{{"tipo":"inversion","activo":"SP500","monto":200,"cuenta":"Itaú USD"}},"respuesta":"Registrada la inversión en SP500"}}
+Usuario: "compré 200 usdt por p2p con itau"
+{{"accion":{{"tipo":"gasto","cuenta":"Itaú USD","monto":200,"moneda":"USD","descripcion":"compra USDT P2P","categoria":"Cambio"}},"respuesta":"Anotada la compra de USDT"}}
 Usuario: "quiero ahorrar 500 dólares para diciembre"
 {{"accion":{{"tipo":"meta","nombre":"Ahorro diciembre","objetivo":500,"moneda":"USD","fecha_limite":"31/12/2026"}},"respuesta":"Meta creada, la voy siguiendo"}}
 Usuario: "ponele tope de 15k por mes a la comida"

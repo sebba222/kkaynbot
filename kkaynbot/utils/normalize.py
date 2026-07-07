@@ -2,9 +2,9 @@
 import re
 import unicodedata
 from difflib import get_close_matches
-from typing import Optional
+from typing import Optional, Tuple
 
-from config import CUENTAS
+from config import ACTIVO_PLATAFORMA, CUENTAS, INV_ALIASES
 
 # Palabras que identifican el banco/lugar
 _BANCOS = {
@@ -80,3 +80,30 @@ def nc(n: Optional[str], moneda: Optional[str] = None) -> Optional[str]:
 def valid_account(name: Optional[str]) -> bool:
     """True si el nombre es exactamente una cuenta canónica."""
     return name in CUENTAS
+
+
+def resolve_activo(text: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """Mapea lo que escribe Seba a (plataforma, activo) canónicos.
+
+    Entiende 'btc'→(BINANCE, BITCOIN), 'sp500'→(XTB, SP500), typos leves incluidos.
+    Devuelve (None, None) si no reconoce ningún activo.
+    """
+    limpio = _clean(text)
+    if not limpio:
+        return None, None
+    # coincidencia directa de la frase completa (cubre "sp 500", "s&p500" ya normalizado)
+    directo = limpio.replace(" ", "")
+    for cand in (limpio, directo):
+        if cand in INV_ALIASES:
+            activo = INV_ALIASES[cand]
+            return ACTIVO_PLATAFORMA.get(activo), activo
+    # token por token, con tolerancia a typos
+    for tok in limpio.split():
+        if tok in INV_ALIASES:
+            activo = INV_ALIASES[tok]
+            return ACTIVO_PLATAFORMA.get(activo), activo
+        m = get_close_matches(tok, INV_ALIASES.keys(), n=1, cutoff=0.85)
+        if m:
+            activo = INV_ALIASES[m[0]]
+            return ACTIVO_PLATAFORMA.get(activo), activo
+    return None, None

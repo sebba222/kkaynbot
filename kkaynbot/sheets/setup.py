@@ -1,8 +1,13 @@
+from config import INV_DISPLAY_TAB, INV_STORAGE_TAB
 from kkaynbot.sheets.client import ss, inv_cache, reset_ws, get_ws
 from kkaynbot.sheets.config_tab import ensure_extra_tabs
 from kkaynbot.sheets.format import fr, mg, cw, rh
+from kkaynbot.sheets.inversiones import (ensure_inv_tabs, setup_display_header,
+                                         update_inversiones_view)
 from kkaynbot.sheets.theme import (AZ_OSC, AZ_MED, AZ_CLA, TURQ, GR_OSC, GR_CLA,
                                     BLANCO, T_BLA, T_OSC, MORADO, MOR_MED)
+from kkaynbot.utils.helpers import sf
+from kkaynbot.utils.normalize import resolve_activo
 
 
 def setup_sheets():
@@ -63,22 +68,33 @@ def setup_sheets():
     rqp += [cw(wpc,15,115), cw(wpc,16,115)]
     sp.batch_update({"requests": rqp})
 
-    # ── 3. INVERSIONES ──
-    if "Inversiones" not in existing:
-        wi = sp.add_worksheet("Inversiones", rows=500, cols=7)
-    else:
-        wi = existing["Inversiones"]
-    wii = wi._properties['sheetId']
-    wi.batch_update([
-        {"range": "A1", "values": [["📈  REGISTRO DE INVERSIONES"]]},
-        {"range": "A3", "values": [["FECHA", "ACTIVO", "MONTO", "MONEDA", "CUENTA ORIGEN", "COTIZACIÓN", "NOTAS"]]},
-    ])
-    sp.batch_update({"requests": [
-        fr(wii,1,1,1,7,bold=True,bg=MORADO,fg=T_BLA,sz=13,al="CENTER"), mg(wii,1,1,1,7), rh(wii,1,45),
-        fr(wii,2,1,2,7,bg=BLANCO), rh(wii,2,10),
-        fr(wii,3,1,3,7,bold=True,bg=MOR_MED,fg=T_BLA,al="CENTER"), rh(wii,3,26),
-        {"updateSheetProperties": {"properties": {"sheetId": wii, "gridProperties": {"frozenRowCount": 3}}, "fields": "gridProperties.frozenRowCount"}},
-    ]})
+    # ── 3. INVERSIONES (vista por plataforma) + INV DATA (storage) ──
+    # Si venía del formato plano viejo, migramos los activos reconocidos al storage nuevo.
+    pendientes = []
+    if "Inversiones" in existing and INV_STORAGE_TAB not in existing:
+        try:
+            for r in existing["Inversiones"].get_all_values()[3:]:
+                if len(r) >= 3 and r[1].strip():
+                    plat, act = resolve_activo(r[1])
+                    if act:
+                        pendientes.append([
+                            r[0], plat, act, sf(r[2]),
+                            r[3] if len(r) > 3 else "USD", r[4] if len(r) > 4 else "",
+                            r[5] if len(r) > 5 else "", r[6] if len(r) > 6 else "",
+                        ])
+        except Exception:
+            pendientes = []
+
+    inv_creadas = ensure_inv_tabs()   # crea Inv Data (y la vista, si no existía)
+
+    if pendientes:
+        get_ws(INV_STORAGE_TAB).append_rows(pendientes)
+
+    # Convertir/estilar la pestaña Inversiones como vista y rearmarla desde el storage
+    wview = get_ws(INV_DISPLAY_TAB)
+    wview.batch_clear(["A2:P500"])
+    setup_display_header(wview)
+    update_inversiones_view()
 
     # ── 4. CUENTAS (storage) ──
     if "Cuentas" not in existing:
@@ -107,21 +123,23 @@ def setup_sheets():
 
     inv_cache()
     reset_ws()
-    nuevas = [t for t in ["Global", "Por Cuenta", "Inversiones", "Cuentas"] if t not in existing] + extra
+    nuevas = ([t for t in ["Global", "Por Cuenta", "Inversiones", "Cuentas"] if t not in existing]
+              + list(inv_creadas) + extra)
+    msg = "✅ Estructura y diseño actualizados. Datos preservados."
     if nuevas:
-        return f"✅ Estructura lista. Pestañas creadas: {', '.join(nuevas)}\nTus datos existentes fueron preservados."
-    return "✅ Estructura y diseño actualizados. Datos preservados."
+        msg = f"✅ Estructura lista. Pestañas creadas: {', '.join(nuevas)}\nTus datos existentes fueron preservados."
+    if pendientes:
+        msg += f"\n📈 Migré {len(pendientes)} inversión(es) a la nueva vista por plataforma."
+    return msg
 
 
 def reiniciar_sheets():
     """Borra todos los registros y pone los saldos en cero. La estructura queda intacta."""
     wc = get_ws("Cuentas")
-    wi = get_ws("Inversiones")
     wg = get_ws("Global")
     wp = get_ws("Por Cuenta")
 
     wc.batch_clear(["A4:H1000"])
-    wi.batch_clear(["A4:G1000"])
     wg.batch_clear(["A15:H500"])
     wg.batch_update([
         {"range": "A5",  "values": [["", "", "", "", ""]]},
@@ -131,6 +149,13 @@ def reiniciar_sheets():
         {"range": "B2",  "values": [["—"]]},
     ])
     wp.batch_clear(["A2:P500"])
+
+    # Inversiones: vaciar el storage y rearmar la vista (queda con totales en cero)
+    try:
+        get_ws(INV_STORAGE_TAB).batch_clear(["A4:H1000"])
+        update_inversiones_view()
+    except Exception:
+        pass
 
     inv_cache()
     return "✅ Todos los registros eliminados. Saldos en cero.\nLa estructura de las pestañas quedó intacta."
