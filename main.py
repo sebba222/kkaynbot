@@ -1,16 +1,27 @@
+"""Punto de entrada de KkaynBot: arma la aplicación, el scheduler y el webhook."""
 import asyncio
+import hashlib
 import logging
+
 from telegram import Update
 from telegram.error import Conflict, NetworkError
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
+                          MessageHandler, filters)
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from config import TELEGRAM_TOKEN, UYU_TZ, WEBHOOK_URL, PORT
-from kkaynbot.bot.handlers import start, cmd_setup, cmd_resumen, cmd_saldo, cmd_limpiar, cmd_reiniciar, handle_msg
-from kkaynbot.bot.scheduler import weekly_report, check_balance
+from config import PORT, TELEGRAM_TOKEN, UYU_TZ, WEBHOOK_URL, validate_config
+from kkaynbot.bot.handlers import (cmd_exportar, cmd_limpiar, cmd_mes, cmd_metas,
+                                   cmd_presupuesto, cmd_reiniciar, cmd_resumen,
+                                   cmd_saldo, cmd_semana, cmd_setup, handle_msg,
+                                   on_callback, start)
+from kkaynbot.bot.scheduler import check_balance, weekly_report
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Token secreto del webhook: Telegram lo manda en cada POST y PTB rechaza
+# cualquier request que no lo traiga (verifica que venga de Telegram de verdad).
+WEBHOOK_SECRET = hashlib.sha256(f"kkayn:{TELEGRAM_TOKEN}".encode()).hexdigest()
 
 
 async def post_init(app: Application) -> None:
@@ -19,11 +30,11 @@ async def post_init(app: Application) -> None:
     sch.add_job(check_balance, "cron", hour=8, minute=0, args=[app])
     sch.start()
     app.bot_data["scheduler"] = sch
-    logger.info("🤖 KkaynBot v5!")
+    logger.info("🤖 KkaynBot v6!")
 
     if WEBHOOK_URL:
         full_url = f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}"
-        logger.info(f"Webhook URL: {full_url}")
+        logger.info("Webhook URL configurada (token omitido del log)")
 
         async def _set_webhook() -> None:
             # Esperar a que el servidor HTTP esté corriendo Y Railway esté enrutando tráfico.
@@ -36,6 +47,7 @@ async def post_init(app: Application) -> None:
                         url=full_url,
                         allowed_updates=list(Update.ALL_TYPES),
                         drop_pending_updates=(attempt == 0),
+                        secret_token=WEBHOOK_SECRET,
                     )
                     if ok:
                         logger.info(f"Webhook configurado exitosamente (intento {attempt + 1})")
@@ -64,7 +76,9 @@ async def error_handler(update, context) -> None:
     logger.error(f"Error en update {update}: {context.error}", exc_info=context.error)
 
 
-def main():
+def main() -> None:
+    validate_config()  # fallar rápido si falta alguna variable de entorno
+
     app = (
         Application.builder()
         .token(TELEGRAM_TOKEN)
@@ -78,8 +92,14 @@ def main():
     app.add_handler(CommandHandler("setup", cmd_setup))
     app.add_handler(CommandHandler("resumen", cmd_resumen))
     app.add_handler(CommandHandler("saldo", cmd_saldo))
+    app.add_handler(CommandHandler("mes", cmd_mes))
+    app.add_handler(CommandHandler("semana", cmd_semana))
+    app.add_handler(CommandHandler("metas", cmd_metas))
+    app.add_handler(CommandHandler("presupuesto", cmd_presupuesto))
+    app.add_handler(CommandHandler("exportar", cmd_exportar))
     app.add_handler(CommandHandler("limpiar", cmd_limpiar))
     app.add_handler(CommandHandler("reiniciar", cmd_reiniciar))
+    app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
 
     if WEBHOOK_URL:
@@ -88,6 +108,7 @@ def main():
             listen="0.0.0.0",
             port=PORT,
             url_path=TELEGRAM_TOKEN,
+            secret_token=WEBHOOK_SECRET,
             # Sin webhook_url: PTB no llama a setWebhook en el arranque.
             # El webhook se registra en post_init con delay (ver _set_webhook).
             # Sin drop_pending_updates: no borra el webhook existente al arrancar,

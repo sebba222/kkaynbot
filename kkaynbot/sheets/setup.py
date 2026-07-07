@@ -1,4 +1,5 @@
 from kkaynbot.sheets.client import ss, inv_cache, reset_ws, get_ws
+from kkaynbot.sheets.config_tab import ensure_extra_tabs
 from kkaynbot.sheets.format import fr, mg, cw, rh
 from kkaynbot.sheets.theme import (AZ_OSC, AZ_MED, AZ_CLA, TURQ, GR_OSC, GR_CLA,
                                     BLANCO, T_BLA, T_OSC, MORADO, MOR_MED)
@@ -101,9 +102,12 @@ def setup_sheets():
         try: sp.del_worksheet(sp.worksheet(h))
         except: pass
 
+    # Pestañas nuevas (presupuestos/metas y cotización) — migración automática
+    extra = ensure_extra_tabs()
+
     inv_cache()
     reset_ws()
-    nuevas = [t for t in ["Global", "Por Cuenta", "Inversiones", "Cuentas"] if t not in existing]
+    nuevas = [t for t in ["Global", "Por Cuenta", "Inversiones", "Cuentas"] if t not in existing] + extra
     if nuevas:
         return f"✅ Estructura lista. Pestañas creadas: {', '.join(nuevas)}\nTus datos existentes fueron preservados."
     return "✅ Estructura y diseño actualizados. Datos preservados."
