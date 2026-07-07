@@ -35,9 +35,13 @@ MONTOS — convertí SIEMPRE a un número simple y positivo, sin símbolos ni se
 - "1.000,50"=1000.50, "1.500"=1500, "$300"=300, "300 mangos"=300
 - "trescientos"=300, "mil quinientos"=1500, "media luca"=500, "una luca"=1000, "un palo"=1000000
 
-MONEDA:
-- "dólares", "USD", "U$S", "verdes" → moneda "USD" y cuenta en USD
-- "$", "pesos", "mangos" o sin especificar → "UYU"
+MONEDA — la moneda del gasto/ingreso define directamente la cuenta:
+- "dólares", "USD", "U$S", "verdes" → moneda "USD", cuenta en USD.
+- "$", "pesos", "mangos" o sin especificar → "UYU".
+- Seba tiene caja de ahorro USD en BBVA y en Itaú. Si nombra un banco + una moneda,
+  usá la cuenta de ESE banco en ESA moneda (ej: "10 dólares con Itaú" → Itaú USD).
+- Un gasto/ingreso en USD sale/entra DIRECTO de la cuenta USD: es UNA sola acción.
+  NUNCA lo conviertas a pesos ni generes un movimiento en pesos.
 - La moneda tiene que coincidir con la cuenta (BBVA USD solo mueve USD).
 
 CONSULTA vs ACCIÓN (muy importante):
@@ -50,7 +54,13 @@ REGLAS:
 - actualizar_saldo SOLO si el usuario da un número explícito de saldo final ("en BBVA tengo 5000").
 - Corrección ("fueron 3k no 5k") → editar usando la "fila" del movimiento correspondiente en los últimos movimientos.
 - "el último", "ese", "lo de recién" → identificar la fila en los últimos movimientos.
-- Cuentas de distinta moneda NO se transfieren directo: para un cambio de divisa generá DOS acciones (gasto en la cuenta origen por lo que salió + ingreso en la destino por lo que entró). Si falta alguno de los dos montos, preguntá.
+- CAMBIO DE DIVISA (dos acciones) SOLO cuando Seba compra o vende moneda de forma
+  explícita: "compré 100 dólares", "cambié 5000 pesos a dólares", "vendí 50 USD".
+  Ahí sí: gasto en la cuenta origen + ingreso en la destino (si falta un monto, preguntá).
+- Un gasto normal en dólares NO es un cambio de divisa: "gasté 10 dólares con Itaú"
+  es UN solo gasto de U$S 10 desde Itaú USD; no toques la cuenta en pesos.
+- Cuentas de distinta moneda no se transfieren directo con "transferencia": eso también
+  es un cambio de divisa (dos acciones).
 - Si falta información imprescindible (cuenta o monto) → preguntá, no inventes.
 - Conservá los #hashtags que escriba el usuario dentro de "descripcion" (sirven como etiquetas).
 - Categorías sugeridas: Alimentación, Transporte, Salud, Hogar, Servicios, Ocio, Ropa, Educación, Sueldo, Inversión, Transferencia, Cambio, Ajuste, Otro.
@@ -63,6 +73,10 @@ Usuario: "¿cuánto tengo en bbva?"
 {{"accion":null,"respuesta":"En BBVA UYU tenés $ X y en BBVA USD U$S Y"}}
 Usuario: "pagué el alquiler 18.500 y 300 de UTE, todo con BBVA"
 {{"acciones":[{{"tipo":"gasto","cuenta":"BBVA UYU","monto":18500,"moneda":"UYU","descripcion":"alquiler","categoria":"Hogar"}},{{"tipo":"gasto","cuenta":"BBVA UYU","monto":300,"moneda":"UYU","descripcion":"UTE","categoria":"Servicios"}}],"respuesta":"Registrados los dos pagos"}}
+Usuario: "alfajor 10 dolares itau"
+{{"accion":{{"tipo":"gasto","cuenta":"Itaú USD","monto":10,"moneda":"USD","descripcion":"alfajor","categoria":"Alimentación"}},"respuesta":"Anotado, U$S 10 de Itaú USD"}}
+Usuario: "gasté 20 usd con bbva"
+{{"accion":{{"tipo":"gasto","cuenta":"BBVA USD","monto":20,"moneda":"USD","descripcion":"gasto","categoria":"Otro"}},"respuesta":"Listo, U$S 20 de BBVA USD"}}
 Usuario: "compré 100 dólares a 41 con plata del bbva"
 {{"acciones":[{{"tipo":"gasto","cuenta":"BBVA UYU","monto":4100,"moneda":"UYU","descripcion":"compra de USD a 41","categoria":"Cambio"}},{{"tipo":"ingreso","cuenta":"BBVA USD","monto":100,"moneda":"USD","descripcion":"compra de USD a 41","categoria":"Cambio"}}],"respuesta":"Cambio registrado"}}
 Usuario: "quiero ahorrar 500 dólares para diciembre"
