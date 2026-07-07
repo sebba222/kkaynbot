@@ -76,6 +76,28 @@ def saldo_msg(ctx: dict) -> str:
     return "\n".join(lines)
 
 
+def saldos_query_msg(ctx: dict, filtro: str = None) -> str:
+    """Saldos en lista vertical (una cuenta por renglón), para responder consultas.
+
+    Si `filtro` matchea un banco o cuenta ("BBVA", "Itaú USD"), muestra solo esas;
+    si no matchea nada, cae a mostrar todas.
+    """
+    s = ctx.get("saldos", {})
+    rate = ctx.get("rate", 40)
+    cuentas = CUENTAS
+    if filtro:
+        fp = _norm(filtro)
+        matches = [c for c in CUENTAS if fp in _norm(c)]
+        if matches:
+            cuentas = matches
+    lines = ["💳 *SALDOS*", ""]
+    for c in cuentas:
+        sym = "$" if "UYU" in c else "U$S"
+        lines.append(f"• {c}: {sym} {s.get(c, 0):,.2f}")
+    lines.append(f"\n💱 1 USD = $ {rate:.2f}")
+    return "\n".join(lines)
+
+
 def top_categorias_lines(ctx: dict, n: int = 3) -> list:
     """Líneas con el top de categorías de gasto del mes actual (en UYU)."""
     now = datetime.now(UYU_TZ)

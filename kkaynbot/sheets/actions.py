@@ -12,7 +12,8 @@ from datetime import datetime
 from typing import Callable, Dict
 
 from config import BUDGET_WARN_PCT, CUENTAS, UYU_TZ
-from kkaynbot.bot.reports import gastos_mes_por_categoria, top_categorias_lines
+from kkaynbot.bot.reports import (gastos_mes_por_categoria, saldos_query_msg,
+                                  top_categorias_lines)
 from kkaynbot.sheets.client import get_ctx, get_ws, inv_cache
 from kkaynbot.sheets.config_tab import get_config, set_budget, set_goal
 from kkaynbot.sheets.global_view import update_global
@@ -305,6 +306,13 @@ def _meta(action: dict) -> str:
     return set_goal(nombre, objetivo, moneda, fecha_limite, base)
 
 
+def _consulta_saldo(action: dict) -> str:
+    ctx = get_ctx()
+    if not ctx:
+        raise ValueError("No pude leer la planilla. Probá de nuevo en unos segundos.")
+    return saldos_query_msg(ctx, action.get("cuenta"))
+
+
 def _resumen(action: dict) -> str:
     ctx = get_ctx()
     if not ctx:
@@ -341,6 +349,7 @@ _HANDLERS: Dict[str, Callable[[dict], str]] = {
     "actualizar_saldo": _actualizar_saldo,
     "presupuesto": _presupuesto,
     "meta": _meta,
+    "consulta_saldo": _consulta_saldo,
     "resumen": _resumen,
 }
 

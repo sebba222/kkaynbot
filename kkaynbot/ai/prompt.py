@@ -28,6 +28,7 @@ TIPOS DE ACCIÓN:
 - actualizar_saldo: {{"tipo":"actualizar_saldo","cuenta":"BBVA UYU","saldo":5000}} SOLO con número explícito de saldo final
 - presupuesto:      {{"tipo":"presupuesto","categoria":"Alimentación","monto":15000}} (monto en UYU por mes; monto 0 = borrar)
 - meta:             {{"tipo":"meta","nombre":"Viaje","objetivo":500,"moneda":"USD","fecha_limite":"31/12/2026"}} (objetivo 0 = borrar)
+- consulta_saldo:    {{"tipo":"consulta_saldo"}} (todas las cuentas) o {{"tipo":"consulta_saldo","cuenta":"BBVA"}} (filtra por banco/cuenta)
 - resumen:          {{"tipo":"resumen"}}
 
 MONTOS — convertí SIEMPRE a un número simple y positivo, sin símbolos ni separadores de miles:
@@ -45,8 +46,9 @@ MONEDA — la moneda del gasto/ingreso define directamente la cuenta:
 - La moneda tiene que coincidir con la cuenta (BBVA USD solo mueve USD).
 
 CONSULTA vs ACCIÓN (muy importante):
-- "¿cuánto tengo...?", "saldo en X", "cómo vengo este mes", "¿cuánto gasté en X?", "¿me alcanza para...?" → CONSULTA ("accion":null); respondé usando los datos del ESTADO.
-- Registrá una acción SOLO cuando el usuario informa un movimiento que ocurrió o pide modificar uno.
+- "¿cuánto tengo?", "saldo", "saldo en X", "cómo estoy en BBVA", "mis cuentas" → usá la acción consulta_saldo (NO texto libre; el bot arma la lista vertical). Con "respuesta":"".
+- "cómo vengo este mes", "¿cuánto gasté en X?", "¿me alcanza para...?" → CONSULTA ("accion":null); respondé usando los datos del ESTADO.
+- Registrá una acción de movimiento SOLO cuando el usuario informa un movimiento que ocurrió o pide modificar uno.
 - "gasté", "pagué", "compré", "me llegó", "cobré", "me pagaron", "pasé", "transferí" → ACCIÓN.
 - Si dudás entre consulta y acción → tratalo como consulta y preguntá.
 
@@ -69,8 +71,10 @@ REGLAS:
 EJEMPLOS:
 Usuario: "gasté 1k5 en el súper con itau"
 {{"accion":{{"tipo":"gasto","cuenta":"Itaú UYU","monto":1500,"moneda":"UYU","descripcion":"súper","categoria":"Alimentación"}},"respuesta":"Anotado el gasto del súper"}}
+Usuario: "¿cuánto tengo?"
+{{"accion":{{"tipo":"consulta_saldo"}},"respuesta":""}}
 Usuario: "¿cuánto tengo en bbva?"
-{{"accion":null,"respuesta":"En BBVA UYU tenés $ X y en BBVA USD U$S Y"}}
+{{"accion":{{"tipo":"consulta_saldo","cuenta":"BBVA"}},"respuesta":""}}
 Usuario: "pagué el alquiler 18.500 y 300 de UTE, todo con BBVA"
 {{"acciones":[{{"tipo":"gasto","cuenta":"BBVA UYU","monto":18500,"moneda":"UYU","descripcion":"alquiler","categoria":"Hogar"}},{{"tipo":"gasto","cuenta":"BBVA UYU","monto":300,"moneda":"UYU","descripcion":"UTE","categoria":"Servicios"}}],"respuesta":"Registrados los dos pagos"}}
 Usuario: "alfajor 10 dolares itau"
