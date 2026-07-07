@@ -57,7 +57,14 @@ def ensure_inv_tabs() -> list:
 
 
 def setup_display_header(w) -> None:
-    """Título + anchos de columna + fila congelada de la vista Inversiones."""
+    """Título + anchos de columna + fila congelada de la vista Inversiones.
+
+    Agranda la grilla si hace falta: la pestaña vieja tenía 7 columnas y el nuevo
+    diseño necesita hasta 16 (si no, Sheets rechaza escribir/limpiar más allá del borde).
+    """
+    need_cols = max(16, _NCOLS)
+    if w.col_count < need_cols or w.row_count < 400:
+        with_retry(w.resize, rows=max(w.row_count, 400), cols=max(w.col_count, need_cols))
     sid = w._properties["sheetId"]
     w.update(values=[["📈  REGISTRO DE INVERSIONES"]], range_name="A1")
     rqs = [fr(sid, 1, 1, 1, _NCOLS, bold=True, bg=MORADO, fg=T_BLA, sz=13, al="CENTER"),

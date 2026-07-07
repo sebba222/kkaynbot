@@ -90,9 +90,10 @@ def setup_sheets():
     if pendientes:
         get_ws(INV_STORAGE_TAB).append_rows(pendientes)
 
-    # Convertir/estilar la pestaña Inversiones como vista y rearmarla desde el storage
+    # Convertir/estilar la pestaña Inversiones como vista y rearmarla desde el storage.
+    # setup_display_header agranda la grilla (7→16 cols) ANTES de escribir/limpiar más
+    # allá del borde viejo; update_inversiones_view limpia A2:P500 y dibuja.
     wview = get_ws(INV_DISPLAY_TAB)
-    wview.batch_clear(["A2:P500"])
     setup_display_header(wview)
     update_inversiones_view()
 
