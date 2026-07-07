@@ -23,7 +23,7 @@ _STORAGE_HEADERS = ["FECHA", "PLATAFORMA", "ACTIVO", "MONTO", "MONEDA",
 _SECTION_BG = {"BINANCE": MOR_MED, "XTB": AZ_MED}
 _MAX_ACTIVOS = max(len(c["activos"]) for c in INVERSIONES.values())
 _NCOLS = _MAX_ACTIVOS * 3 - 1  # 2 cols por activo + 1 separador entre bloques
-_MIN_DATA_ROWS = 3             # filas de registro reservadas por activo (el resto se scrollea)
+_VISIBLE_DATA_ROWS = 5         # registros visibles por activo (los más nuevos; el resto en Inv Data)
 _SEP_COL_PX = 30               # ancho del separador entre bloques de activos
 
 
@@ -128,10 +128,17 @@ def investment_totals(recs: dict = None) -> dict:
 # ────────────────────────────── vista ──────────────────────────────
 
 def _build_layout(sid: int, recs: dict):
-    """Arma (valores, formato) de la vista. Función pura: testeable sin tocar la API."""
-    bv = []   # [{"range","values"}]
-    rqs = []  # requests de formato
-    cur = 3   # fila 1 = título, fila 2 = spacer
+    """Arma la vista. Función pura: testeable sin tocar la API.
+
+    Devuelve (bv, rqs, groups):
+    - bv: valores a escribir  - rqs: requests de formato
+    - groups: [(start0, end0)] rangos de filas (0-based, fin exclusivo) con los
+      registros más viejos, para agruparlos/colapsarlos (acordeón +/−).
+    """
+    bv = []      # [{"range","values"}]
+    rqs = []     # requests de formato
+    groups = []  # rangos de filas viejas a colapsar
+    cur = 3      # fila 1 = título, fila 2 = spacer
 
     totales = investment_totals(recs)
     for plataforma, cfg in INVERSIONES.items():
@@ -147,10 +154,12 @@ def _build_layout(sid: int, recs: dict):
                 mg(sid, cur, 1, cur, width), rh(sid, cur, 32)]
         cur += 1
 
-        # ── fila: títulos de cada activo ──
+        # ── fila: títulos de cada activo (con contador si hay más que los visibles) ──
         for i, a in enumerate(activos):
             c = 3 * i + 1
-            bv.append({"range": f"{col_letter(c)}{cur}", "values": [[a]]})
+            n = len(recs.get(a, []))
+            titulo = a if n <= _VISIBLE_DATA_ROWS else f"{a}  ({n})"
+            bv.append({"range": f"{col_letter(c)}{cur}", "values": [[titulo]]})
             rqs += [fr(sid, cur, c, cur, c + 1, bold=True, bg=TURQ, fg=T_BLA, sz=11, al="CENTER"),
                     mg(sid, cur, c, cur, c + 1)]
         rqs.append(rh(sid, cur, 28))
@@ -172,13 +181,17 @@ def _build_layout(sid: int, recs: dict):
         rqs.append(rh(sid, cur, 24))
         cur += 1
 
-        # ── filas de datos: más nuevas primero, ventana mínima de 3 filas ──
-        maxlen = max([len(recs.get(a, [])) for a in activos] + [_MIN_DATA_ROWS])
+        # ── filas de datos: las {_VISIBLE_DATA_ROWS} más nuevas visibles; el resto,
+        #    en un grupo colapsable (acordeón). Todo nuevo→viejo. ──
+        visible = _VISIBLE_DATA_ROWS
+        max_count = max([len(recs.get(a, [])) for a in activos] + [0])
+        extra = max(0, max_count - visible)       # filas viejas que van al grupo
+        total_rows = max(visible, visible + extra)
         data_start = cur
         for i, a in enumerate(activos):
             c = 3 * i + 1
-            lst = list(reversed(recs.get(a, [])))  # storage viene viejo→nuevo; mostramos nuevo→viejo
-            for j in range(maxlen):
+            lst = list(reversed(recs.get(a, [])))  # storage viejo→nuevo; mostramos nuevo→viejo
+            for j in range(total_rows):
                 fila = data_start + j
                 if j < len(lst):
                     rec = lst[j]
@@ -188,20 +201,47 @@ def _build_layout(sid: int, recs: dict):
                     rqs.append(fr(sid, fila, c, fila, c + 1, bg=GR_CLA, fg=T_OSC, al="CENTER"))
                 else:
                     rqs.append(fr(sid, fila, c, fila, c + 1, bg=BLANCO))
-        for j in range(maxlen):
+        for j in range(total_rows):
             rqs.append(rh(sid, data_start + j, 24))
-        cur = data_start + maxlen
+        if extra > 0:
+            start0 = data_start + visible - 1     # primera fila vieja (0-based)
+            groups.append((start0, start0 + extra))
+        cur = data_start + total_rows
 
         # ── 3 filas separadoras entre secciones ──
         for _ in range(3):
             rqs += [fr(sid, cur, 1, cur, _NCOLS, bg=BLANCO), rh(sid, cur, 14)]
             cur += 1
 
-    return bv, rqs
+    return bv, rqs, groups
+
+
+def _clear_row_groups(sp, sid: int) -> None:
+    """Borra los grupos de filas existentes en la hoja (se recrean en cada render)."""
+    try:
+        meta = sp.fetch_sheet_metadata(params={"fields": "sheets(properties(sheetId),rowGroups)"})
+    except Exception as e:
+        logger.warning(f"inversiones: no pude leer grupos ({e})")
+        return
+    reqs = []
+    for sh in meta.get("sheets", []):
+        if sh.get("properties", {}).get("sheetId") != sid:
+            continue
+        for grp in sh.get("rowGroups", []) or []:
+            rng = grp.get("range", {})
+            if "startIndex" in rng and "endIndex" in rng:
+                reqs.append({"deleteDimensionGroup": {"range": {
+                    "sheetId": sid, "dimension": "ROWS",
+                    "startIndex": rng["startIndex"], "endIndex": rng["endIndex"]}}})
+    if reqs:
+        try:
+            with_retry(sp.batch_update, {"requests": reqs})
+        except Exception as e:
+            logger.warning(f"inversiones: no pude limpiar grupos ({e})")
 
 
 def update_inversiones_view() -> None:
-    """Reconstruye la vista Inversiones desde el storage."""
+    """Reconstruye la vista Inversiones desde el storage (con acordeón de filas viejas)."""
     try:
         recs = get_investments()
     except Exception as e:
@@ -214,11 +254,27 @@ def update_inversiones_view() -> None:
         ensure_inv_tabs()
         w = get_ws(INV_DISPLAY_TAB)
     sid = w._properties["sheetId"]
+    # los grupos viejos hay que borrarlos ANTES de reescribir (las filas se corren)
+    _clear_row_groups(sp, sid)
     w.batch_clear(["A2:P500"])
-    bv, rqs = _build_layout(sid, recs)
+    bv, rqs, groups = _build_layout(sid, recs)
     unmerge = {"unmergeCells": {"range": {"sheetId": sid, "startRowIndex": 1, "endRowIndex": 500,
                "startColumnIndex": 0, "endColumnIndex": 16}}}
     if rqs:
         with_retry(sp.batch_update, {"requests": [unmerge] + rqs})
     if bv:
         with_retry(w.batch_update, bv)
+    # crear y colapsar los grupos de registros viejos (arrancan cerrados)
+    if groups:
+        greqs = []
+        for s0, e0 in groups:
+            greqs.append({"addDimensionGroup": {"range": {
+                "sheetId": sid, "dimension": "ROWS", "startIndex": s0, "endIndex": e0}}})
+        for s0, e0 in groups:
+            greqs.append({"updateDimensionGroup": {"dimensionGroup": {
+                "range": {"sheetId": sid, "dimension": "ROWS", "startIndex": s0, "endIndex": e0},
+                "depth": 1, "collapsed": True}, "fields": "collapsed"}})
+        try:
+            with_retry(sp.batch_update, {"requests": greqs})
+        except Exception as e:
+            logger.warning(f"inversiones: no pude crear el acordeón ({e})")
