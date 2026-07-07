@@ -1,7 +1,7 @@
 """Ejecución de acciones sobre la planilla: registrar, editar, transferir, resumir.
 
 Todas las funciones son bloqueantes (gspread + time.sleep): los handlers las
-ejecutan con asyncio.to_thread para no congelar el bot.
+ejecutan en un thread (run_blocking) para no congelar el bot.
 Los errores esperables se levantan como ValueError con mensajes aptos para
 mostrar directamente al usuario.
 """

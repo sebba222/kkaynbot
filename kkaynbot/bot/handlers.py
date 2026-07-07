@@ -1,5 +1,4 @@
 """Handlers de Telegram: comandos, mensajes de texto y confirmaciones inline."""
-import asyncio
 import functools
 import logging
 import time
@@ -17,6 +16,7 @@ from kkaynbot.sheets.actions import exe
 from kkaynbot.sheets.client import get_ctx
 from kkaynbot.sheets.config_tab import get_config, set_budget
 from kkaynbot.sheets.setup import reiniciar_sheets, setup_sheets
+from kkaynbot.utils.aio import run_blocking
 from kkaynbot.utils.helpers import parse_amount
 
 logger = logging.getLogger(__name__)
@@ -73,18 +73,20 @@ async def start(u, c):
 async def cmd_setup(u, c):
     await u.effective_message.reply_text("⚙️ Aplicando diseño...")
     try:
-        r = await asyncio.to_thread(setup_sheets)
+        r = await run_blocking(setup_sheets)
         await _reply(u, r)
     except Exception as e:
         logger.error(f"setup: {e}", exc_info=True)
-        await u.effective_message.reply_text("❌ No pude actualizar la estructura. Fijate los logs de Railway.")
+        await u.effective_message.reply_text(
+            "❌ No pude actualizar la estructura. Fijate los logs del servidor "
+            "(journalctl -u kkaynbot).")
 
 
 @authorized
 async def cmd_resumen(u, c):
     await u.effective_message.reply_text("🔄 Calculando...")
     try:
-        r = await asyncio.to_thread(exe, {"tipo": "resumen"})
+        r = await run_blocking(exe, {"tipo": "resumen"})
         await _reply(u, r)
     except ValueError as e:
         await u.effective_message.reply_text(f"❌ {e}")
@@ -96,7 +98,7 @@ async def cmd_resumen(u, c):
 @authorized
 async def cmd_saldo(u, c):
     try:
-        ctx = await asyncio.to_thread(get_ctx, True)
+        ctx = await run_blocking(get_ctx, True)
         if not ctx:
             await u.effective_message.reply_text("⏳ Sheets no está disponible, intentá en unos segundos.")
             return
@@ -109,7 +111,7 @@ async def cmd_saldo(u, c):
 @authorized
 async def cmd_mes(u, c):
     try:
-        ctx = await asyncio.to_thread(get_ctx, True)
+        ctx = await run_blocking(get_ctx, True)
         if not ctx:
             await u.effective_message.reply_text("⏳ Sheets no está disponible, intentá en unos segundos.")
             return
@@ -122,7 +124,7 @@ async def cmd_mes(u, c):
 @authorized
 async def cmd_semana(u, c):
     try:
-        ctx = await asyncio.to_thread(get_ctx, True)
+        ctx = await run_blocking(get_ctx, True)
         if not ctx:
             await u.effective_message.reply_text("⏳ Sheets no está disponible, intentá en unos segundos.")
             return
@@ -135,8 +137,8 @@ async def cmd_semana(u, c):
 @authorized
 async def cmd_metas(u, c):
     try:
-        ctx = await asyncio.to_thread(get_ctx)
-        cfg = await asyncio.to_thread(get_config)
+        ctx = await run_blocking(get_ctx)
+        cfg = await run_blocking(get_config)
         await _reply(u, reports.metas_msg(cfg, ctx))
     except Exception as e:
         logger.error(f"metas: {e}", exc_info=True)
@@ -149,8 +151,8 @@ async def cmd_presupuesto(u, c):
     args = c.args or []
     try:
         if not args:
-            ctx = await asyncio.to_thread(get_ctx)
-            cfg = await asyncio.to_thread(get_config)
+            ctx = await run_blocking(get_ctx)
+            cfg = await run_blocking(get_config)
             await _reply(u, reports.presupuestos_msg(cfg, ctx))
             return
         if args[0].lower() in ("borrar", "eliminar") and len(args) >= 2:
@@ -161,7 +163,7 @@ async def cmd_presupuesto(u, c):
             if monto is None or not cat:
                 await _reply(u, "Usá: `/presupuesto Alimentación 15000` o `/presupuesto borrar Alimentación`")
                 return
-        r = await asyncio.to_thread(set_budget, cat, monto)
+        r = await run_blocking(set_budget, cat, monto)
         await _reply(u, r)
     except Exception as e:
         logger.error(f"presupuesto: {e}", exc_info=True)
@@ -173,7 +175,7 @@ async def cmd_exportar(u, c):
     """Genera un CSV del mes (o de todo con /exportar todo) y lo manda como documento."""
     alcance = "todo" if (c.args and c.args[0].lower() == "todo") else "mes"
     try:
-        ctx = await asyncio.to_thread(get_ctx, True)
+        ctx = await run_blocking(get_ctx, True)
         if not ctx:
             await u.effective_message.reply_text("⏳ Sheets no está disponible, intentá en unos segundos.")
             return
@@ -224,7 +226,7 @@ async def on_callback(u, c):
     elif q.data == "reiniciar_si":
         await q.edit_message_text("🗑️ Borrando todos los registros...")
         try:
-            r = await asyncio.to_thread(reiniciar_sheets)
+            r = await run_blocking(reiniciar_sheets)
             await q.edit_message_text(r)
         except Exception as e:
             logger.error(f"reiniciar: {e}", exc_info=True)

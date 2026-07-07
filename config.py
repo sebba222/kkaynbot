@@ -1,6 +1,7 @@
 """Configuración central de KkaynBot: variables de entorno, constantes y validación."""
 import json
 import os
+from pathlib import Path
 
 import pytz
 
@@ -23,12 +24,20 @@ def _float_env(name: str, default: str) -> float:
 TELEGRAM_TOKEN          = os.environ.get("TELEGRAM_TOKEN", "").strip()
 GROQ_API_KEY            = os.environ.get("GROQ_API_KEY", "").strip()
 SPREADSHEET_ID          = os.environ.get("SPREADSHEET_ID", "").strip()
+# Credenciales de Google: primero la variable de entorno; si no está, se lee el
+# archivo GOOGLE_CREDENTIALS_FILE (default: credentials.json junto a este archivo).
+# En Oracle Cloud el service file no define la variable y se usa el archivo.
 GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "").strip()
-WEBHOOK_URL             = os.environ.get("WEBHOOK_URL", "").strip().rstrip("/")  # ej: https://kkaynbot.railway.app
+GOOGLE_CREDENTIALS_FILE = os.environ.get("GOOGLE_CREDENTIALS_FILE", "").strip() or \
+    str(Path(__file__).resolve().parent / "credentials.json")
+if not GOOGLE_CREDENTIALS_JSON:
+    try:
+        GOOGLE_CREDENTIALS_JSON = Path(GOOGLE_CREDENTIALS_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
+        pass  # validate_config() lo reporta con mensaje claro
 AUTHORIZED_USER_ID      = _int_env("AUTHORIZED_USER_ID", "0")
 MIN_BALANCE_UYU         = _float_env("MIN_BALANCE_UYU", "500")
 MIN_BALANCE_USD         = _float_env("MIN_BALANCE_USD", "50")
-PORT                    = _int_env("PORT", "8443")
 
 # ── Constantes de comportamiento ──
 CACHE_TTL_SECONDS  = 20    # vida del caché del contexto de Sheets
@@ -66,7 +75,7 @@ def validate_config() -> None:
     if AUTHORIZED_USER_ID <= 0:
         faltan.append("AUTHORIZED_USER_ID")
     if not GOOGLE_CREDENTIALS_JSON:
-        faltan.append("GOOGLE_CREDENTIALS_JSON")
+        faltan.append(f"GOOGLE_CREDENTIALS_JSON (variable o archivo {GOOGLE_CREDENTIALS_FILE})")
     else:
         try:
             json.loads(GOOGLE_CREDENTIALS_JSON)
@@ -74,6 +83,6 @@ def validate_config() -> None:
             faltan.append("GOOGLE_CREDENTIALS_JSON (no contiene JSON válido)")
     if faltan:
         raise SystemExit(
-            "❌ Configuración incompleta. Revisá estas variables de entorno en Railway: "
+            "❌ Configuración incompleta. Revisá estas variables de entorno del servicio: "
             + ", ".join(faltan)
         )

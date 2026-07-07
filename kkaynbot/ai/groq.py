@@ -1,5 +1,4 @@
 """Cliente de Groq: llamada al LLM con JSON mode, parsing robusto y ejecución de acciones."""
-import asyncio
 import json
 import logging
 import re
@@ -13,6 +12,7 @@ from kkaynbot.ai.prompt import SYSTEM_PROMPT
 from kkaynbot.sheets.actions import exe
 from kkaynbot.sheets.client import get_ctx
 from kkaynbot.sheets.config_tab import get_config
+from kkaynbot.utils.aio import run_blocking
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ def _parse_json(raw: str) -> dict:
 async def _run_action(a: dict) -> str:
     """Ejecuta una acción en un thread y traduce los errores a mensajes amigables."""
     try:
-        return await asyncio.to_thread(exe, a)
+        return await run_blocking(exe, a)
     except ValueError as e:
         return f"❌ {e}"
     except Exception as e:
@@ -92,8 +92,8 @@ async def _run_action(a: dict) -> str:
 async def process_msg(update, user_message: str) -> str:
     """Procesa un mensaje de texto: arma el contexto, consulta a Groq y ejecuta acciones."""
     uid = update.effective_user.id
-    ctx = await asyncio.to_thread(get_ctx)
-    cfg = await asyncio.to_thread(get_config)
+    ctx = await run_blocking(get_ctx)
+    cfg = await run_blocking(get_config)
     sys = SYSTEM_PROMPT.format(
         saldos=json.dumps(ctx.get("saldos", {}), ensure_ascii=False),
         ult=json.dumps(ctx.get("ult", []), ensure_ascii=False),
@@ -111,7 +111,7 @@ async def process_msg(update, user_message: str) -> str:
     historia.append({"role": "user", "content": user_message})
     del historia[:-HISTORY_LIMIT]
     try:
-        raw = await asyncio.to_thread(groq, [{"role": "system", "content": sys}] + historia)
+        raw = await run_blocking(groq, [{"role": "system", "content": sys}] + historia)
         parsed = _parse_json(raw)
     except GroqError:
         historia.pop()  # no dejar el mensaje colgado sin respuesta en el historial

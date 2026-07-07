@@ -124,7 +124,7 @@ _TRANSIENT_MARKERS = ("429", "RESOURCE_EXHAUSTED", "RATE_LIMIT", "500", "502", "
 def with_retry(func: Callable, *args, max_retries: int = SHEETS_MAX_RETRIES, **kwargs):
     """Ejecuta una función con backoff exponencial + jitter ante errores transitorios.
 
-    Bloqueante: las acciones que la usan corren en un thread (asyncio.to_thread),
+    Bloqueante: las acciones que la usan corren en un thread (run_blocking),
     así el event loop del bot nunca se congela.
     """
     for attempt in range(max_retries):

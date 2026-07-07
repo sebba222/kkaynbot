@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .idea/
 .env
+credentials.json
+clavesOracle/
+*.key
+*.pub
